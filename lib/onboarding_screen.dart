@@ -167,7 +167,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(28, 50, 28, 120),
+              padding: EdgeInsets.fromLTRB(28, 50, 28, MediaQuery.of(context).padding.bottom + 90),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -277,7 +277,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // ─── Page 2: 기능 미리보기 ────────────────────────────────────
   Widget _buildPage2() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 80, 24, 100),
+      padding: EdgeInsets.fromLTRB(24, 80, 24, MediaQuery.of(context).padding.bottom + 90),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -399,7 +399,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // ─── Page 3: 예시 결과 카드 ───────────────────────────────────
   Widget _buildPage3() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 72, 24, 100),
+      padding: EdgeInsets.fromLTRB(24, 72, 24, MediaQuery.of(context).padding.bottom + 90),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
