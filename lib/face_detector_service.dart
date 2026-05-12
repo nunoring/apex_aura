@@ -382,7 +382,7 @@ class FaceDetectorService {
       '여우상': 0.0,
     };
 
-    // 1. 눈꼬리 각도 (가중치 높음 — 표정 영향 적음)
+    // 1. 눈꼬리 각도 (가중치 높음)
     if (eyeAngle > 5) {
       scores['고양이상'] = scores['고양이상']! + 3;
       scores['여우상'] = scores['여우상']! + 3;
@@ -398,26 +398,32 @@ class FaceDetectorService {
       scores['강아지상'] = scores['강아지상']! + 2;
       scores['곰상'] = scores['곰상']! + 1;
     } else {
+      // 중립 범위: 늑대상만 (강아지상 기본 편향 제거)
       scores['늑대상'] = scores['늑대상']! + 2;
-      scores['강아지상'] = scores['강아지상']! + 1;
     }
 
     // 2. 얼굴 비율 (yaw 보정 적용)
-    if (correctedFaceRatio > 0.85) {
+    if (correctedFaceRatio > 0.90) {
+      // 매우 둥근 얼굴만 강아지/곰상
       scores['곰상'] = scores['곰상']! + 3;
       scores['강아지상'] = scores['강아지상']! + 2;
       scores['고양이상'] = scores['고양이상']! - 1;
       scores['늑대상'] = scores['늑대상']! - 1;
+    } else if (correctedFaceRatio > 0.80) {
+      // 약간 둥근 얼굴
+      scores['곰상'] = scores['곰상']! + 2;
+      scores['강아지상'] = scores['강아지상']! + 1;
     } else if (correctedFaceRatio < 0.65) {
       scores['늑대상'] = scores['늑대상']! + 3;
       scores['고양이상'] = scores['고양이상']! + 2;
       scores['여우상'] = scores['여우상']! + 2;
       scores['곰상'] = scores['곰상']! - 1;
-    } else {
-      scores['강아지상'] = scores['강아지상']! + 1;
-      scores['고양이상'] = scores['고양이상']! + 1;
+    } else if (correctedFaceRatio < 0.72) {
+      // 갸름한 편
       scores['늑대상'] = scores['늑대상']! + 1;
+      scores['고양이상'] = scores['고양이상']! + 1;
     }
+    // 0.72~0.80: 진짜 중립 → 아무도 보너스 없음
 
     // 3. 눈 간격
     if (eyeGapRatio > 0.45) {
@@ -427,9 +433,8 @@ class FaceDetectorService {
       scores['고양이상'] = scores['고양이상']! + 2;
       scores['여우상'] = scores['여우상']! + 2;
       scores['늑대상'] = scores['늑대상']! + 1;
-    } else {
-      scores['강아지상'] = scores['강아지상']! + 1;
     }
+    // 0.35~0.45 중립 → 아무도 보너스 없음 (강아지상 기본 편향 제거)
 
     // 4. 황금비율 (코 길이 비율) — 가중치: 중간
     // 0.28~0.38: 이상적. 낮을수록 코가 짧음(강아지/곰상), 높을수록 코가 김(늑대/여우상)
