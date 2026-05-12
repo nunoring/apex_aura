@@ -198,7 +198,7 @@ class _LoadingScreenState extends State<LoadingScreen>
       });
       _startGptMessages();
 
-      final result = await _callFirebase(faceData);
+      final result = await _getAnalysisWithRetry(faceData);
 
       // Step 4: 결과 생성 완료
       _timerController.stop();
@@ -260,7 +260,123 @@ class _LoadingScreenState extends State<LoadingScreen>
     });
   }
 
-  Future<Map<String, dynamic>> _callFirebase(Map<String, dynamic> faceData) async {
+  static const List<String> _bannedWords = [
+    '필러', '보톡스', '성형', '수술', '리프팅', '레이저', '시술', '이식', '윤곽술',
+    '처방', '치료', '진료', '임상', '의학적', '의사',
+    '약물', '호르몬',
+    '못생긴', '결함', '흠', '단점', '못난', '추한',
+  ];
+
+  bool _isValidResponse(Map<String, dynamic> data) {
+    try {
+      if (!data.containsKey('comparison') ||
+          !data.containsKey('radar') ||
+          !data.containsKey('consultant_report') ||
+          !data.containsKey('action_cards') ||
+          !data.containsKey('milestones')) return false;
+      final cards = data['action_cards'] as List;
+      if (cards.length < 3) return false;
+      final report = data['consultant_report'];
+      if ((report['observation'] as String).length < 30) return false;
+      for (final card in cards) {
+        if ((card['principle'] as String).length < 50) return false;
+        if ((card['observation'] as String).length < 30) return false;
+        if ((card['application'] as String).length < 30) return false;
+        if ((card['references'] as List).length < 2) return false;
+      }
+      if ((data['milestones'] as List).length < 3) return false;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> _getAnalysisWithRetry(
+    Map<String, dynamic> faceData, {
+    int retryCount = 0,
+    String? extraInstruction,
+  }) async {
+    final response = await _callFirebase(faceData, extraInstruction: extraInstruction);
+    final responseText = jsonEncode(response);
+    final hasBanned = _bannedWords.any((w) => responseText.contains(w));
+    if (!hasBanned && _isValidResponse(response)) return response;
+    if (retryCount >= 2) return _buildFallbackResponse();
+    return _getAnalysisWithRetry(
+      faceData,
+      retryCount: retryCount + 1,
+      extraInstruction: hasBanned
+          ? '이전 응답에 금지 단어가 포함됐어요. 시술/의료 관련 표현을 헤어, 메이크업, 패션 관련 표현으로 대체해서 다시 응답해줘.'
+          : '이전 응답이 필수 형식을 충족하지 않았어요. JSON 구조와 최소 글자 수를 지켜서 다시 응답해줘.',
+    );
+  }
+
+  Map<String, dynamic> _buildFallbackResponse() {
+    return {
+      "comparison": {
+        "current_animal": "분석 중",
+        "target_animal": widget.animalType,
+        "current_keywords": ["자연스러움", "친근함", "부드러움"],
+        "target_keywords": ["세련됨", "정돈됨", "또렷함"],
+        "gap_percent": 50
+      },
+      "radar": {
+        "current": {"눈매": 0.5, "코": 0.5, "얼굴윤곽": 0.5, "스타일": 0.4},
+        "target": {"눈매": 0.8, "코": 0.7, "얼굴윤곽": 0.8, "스타일": 0.85}
+      },
+      "consultant_report": {
+        "quote": "더 세련된 스타일로 변화할 수 있는 포인트들이 있어요.",
+        "observation": "전반적으로 자연스럽고 친근한 인상이에요. 눈매와 헤어 스타일링에서 변화 포인트를 찾을 수 있어요.",
+        "impact": "부드럽고 편안한 느낌을 줘요.",
+        "gap": "눈매와 스타일링 완성도에서 차이가 있어요.",
+        "direction": "눈 연출과 헤어 스타일링이 핵심이에요."
+      },
+      "action_cards": [
+        {
+          "category": "헤어스타일",
+          "icon": "scissors",
+          "observation": "현재 헤어스타일이 얼굴 윤곽을 가리고 있어 인상이 다소 묻히고 있어요.",
+          "principle": "레이어드컷은 얼굴 옆선을 자연스럽게 드러내 윤곽을 강조하는 효과가 있어요. 볼륨과 라인을 동시에 잡을 수 있어서 인상 변화에 효율적인 방법이에요.",
+          "application": "미디엄 레이어드 또는 가르마형 앞머리로 변화를 주는 게 좋아요.",
+          "references": [
+            {"name": "고준희", "context": "2022 SNS 화보", "description": "쇄골 위 단발로 목선을 드러낸 자연스러운 스타일"},
+            {"name": "한지민", "context": "드라마 미스티", "description": "어깨 길이 레이어드, 옆선을 자연스럽게 강조한 스타일"}
+          ],
+          "caution": null
+        },
+        {
+          "category": "패션/스타일링",
+          "icon": "shirt",
+          "observation": "전체적인 스타일링 완성도를 높이면 인상이 한층 달라질 수 있어요.",
+          "principle": "핏이 맞는 상의와 세로 라인을 강조하는 아이템이 세련된 인상을 만들어요. 색상 통일감도 전체적인 완성도에 크게 영향을 줘요.",
+          "application": "슬림핏 상의와 단색 위주의 조합으로 정돈된 느낌을 주세요.",
+          "references": [
+            {"name": "정해인", "context": "2023 화보", "description": "심플한 화이트 셔츠로 깔끔한 인상 연출"},
+            {"name": "박서준", "context": "드라마 이태원클라쓰", "description": "블랙 핏 자켓으로 세련된 라인 강조"}
+          ],
+          "caution": null
+        },
+        {
+          "category": widget.gender == 'female' ? '메이크업' : '그루밍',
+          "icon": widget.gender == 'female' ? 'makeup' : 'grooming',
+          "observation": "눈매 연출과 눈썹 정리가 전체 인상 변화의 핵심 포인트예요.",
+          "principle": "아이라인과 마스카라로 눈매를 또렷하게 만들면 전체 인상이 달라져요. 눈썹 형태를 잡아주는 것만으로도 얼굴 정돈 효과가 크게 나타나요.",
+          "application": "눈 꼬리 라인 강조와 볼륨 마스카라로 눈매를 선명하게 만들어보세요.",
+          "references": [
+            {"name": "맥 플루이드라인", "context": "#blacktrack", "description": "지속력 좋은 리퀴드 라이너로 선명한 라인 완성"},
+            {"name": "랑콤 모노시크라", "context": "01 Cils Noirs", "description": "컬링과 볼륨을 동시에, 자연스러운 눈매 완성"}
+          ],
+          "caution": null
+        }
+      ],
+      "milestones": [
+        {"days": 30, "description": "눈매 연출 변화 체감 시작"},
+        {"days": 60, "description": "헤어 스타일 전환 완성"},
+        {"days": 90, "description": "전체 스타일링 완성 및 인상 변화 체감"}
+      ]
+    };
+  }
+
+  Future<Map<String, dynamic>> _callFirebase(Map<String, dynamic> faceData, {String? extraInstruction}) async {
     final impression = widget.sliderValue < 0.4
         ? "초식계"
         : widget.sliderValue > 0.6
@@ -279,6 +395,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         'impression': impression,
         'faceData': faceData,
         'gender': widget.gender,
+        if (extraInstruction != null) 'extraInstruction': extraInstruction,
       }),
     );
 
