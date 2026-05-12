@@ -14,6 +14,7 @@ class LoadingScreen extends StatefulWidget {
   final List<File> imageFiles;
   final int faceIndex;
   final String gender; // 'male' | 'female'
+  final bool isPro;
 
   const LoadingScreen({
     super.key,
@@ -22,6 +23,7 @@ class LoadingScreen extends StatefulWidget {
     required this.imageFiles,
     this.faceIndex = -1,
     this.gender = 'male',
+    this.isPro = false,
   });
 
   File get primaryImage => imageFiles[0];
@@ -395,7 +397,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         'impression': impression,
         'faceData': faceData,
         'gender': widget.gender,
-        'isPro': false,
+        'isPro': widget.isPro,
         if (extraInstruction != null) 'extraInstruction': extraInstruction,
       }),
     );

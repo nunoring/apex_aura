@@ -707,6 +707,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 sliderValue: 0.5,
                                 imageFiles: _selectedImages,
                                 gender: _gender,
+                                isPro: _isSubscribed,
                               ),
                             ),
                           );
