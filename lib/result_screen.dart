@@ -39,16 +39,128 @@ class _ResultScreenState extends State<ResultScreen> {
   int _currentPage = 0;
   int _curriculumTab = 0;
   bool _isSubscribed = false;
+  bool _isPro = false;
+  List<Widget> _pages = [];
 
   @override
   void initState() {
     super.initState();
-    _checkSubscription();
+    _initPageFlow();
   }
 
-  Future<void> _checkSubscription() async {
-    final ok = await SubscriptionService.isSubscribed();
-    if (mounted) setState(() => _isSubscribed = ok);
+  Future<void> _initPageFlow() async {
+    final isPro = await SubscriptionService.isSubscribed();
+    if (!mounted) return;
+    setState(() {
+      _isPro = isPro;
+      _isSubscribed = isPro;
+      _pages = isPro ? _buildProPages() : _buildFreePages();
+      _pageTitles = isPro
+          ? ['첫인상', '외모 점수', '갭 분석', '3박자 솔루션', '메이크업', '패션 룩']
+          : ['첫인상', '수치 분석', '갭 분석', '변신 플랜'];
+    });
+  }
+
+  List<Widget> _buildFreePages() => [
+    _buildPage1(),
+    _buildPage2(),
+    _buildGapPage(),
+    _buildPage3(),
+  ];
+
+  List<Widget> _buildProPages() => [
+    _buildPage1(),
+    _buildPage2(),
+    _buildGapPage(),
+    _buildPage3(),
+    _buildPlaceholderPage('메이크업', Icons.face_retouching_natural),
+    _buildPlaceholderPage('패션 룩', Icons.checkroom_outlined),
+  ];
+
+  Widget _buildPlaceholderPage(String title, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: const Color(0xFF333333)),
+          const SizedBox(height: 16),
+          Text(title,
+              style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
+          const SizedBox(height: 8),
+          const Text('준비 중이에요',
+              style: TextStyle(fontSize: 13, color: Color(0xFF444444))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGapPage() {
+    final r = analysisResult;
+    final gapList = r['gap_analysis'] as List?;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('갭 분석',
+              style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text('${r['comparison']?['current_animal'] ?? ''} → ${r['comparison']?['target_animal'] ?? widget.animalType}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF555555))),
+          const SizedBox(height: 16),
+          if (gapList != null && gapList.isNotEmpty)
+            ...gapList.map((g) {
+              final item = g['item']?.toString() ?? '';
+              final score = (g['score'] as num?)?.toDouble() ?? 0.5;
+              final tag = g['tag']?.toString() ?? '';
+              final level = g['level']?.toString() ?? 'mid';
+              final color = level == 'easy'
+                  ? const Color(0xFF27AE60)
+                  : level == 'hard'
+                      ? const Color(0xFFC0392B)
+                      : const Color(0xFFE8A030);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Text(item, style: const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC))),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withAlpha(30),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: color.withAlpha(80), width: 0.5),
+                        ),
+                        child: Text(tag, style: TextStyle(fontSize: 10, color: color)),
+                      ),
+                    ]),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: score.clamp(0.0, 1.0),
+                        backgroundColor: const Color(0xFF222222),
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          if (gapList == null || gapList.isEmpty) ...[
+            const SizedBox(height: 40),
+            const Center(
+              child: Text('갭 분석 데이터가 없어요',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF444444))),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   // 능력치 점수 계산 (공유 카드와 앱 내 동일하게 사용)
@@ -116,7 +228,7 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  static const _pageTitles = ['첫인상', '수치 분석', '액션 플랜'];
+  List<String> _pageTitles = ['첫인상', '수치 분석', '변신 플랜'];
 
   @override
   void dispose() {
@@ -206,26 +318,14 @@ class _ResultScreenState extends State<ResultScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) async {
-                  // 수치 분석(1)·추천(3)은 구독 필요. 액션 플랜(2)은 헤어 탭 무료 노출용으로 허용.
-                  if (i == 1 && !_isSubscribed) {
-                    _pageController.animateToPage(0,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeOut);
-                    final ok = await PaywallBottomSheet.show(context);
-                    if (ok && mounted) setState(() => _isSubscribed = true);
-                  } else {
-                    setState(() => _currentPage = i);
-                  }
-                },
-                children: [
-                  _buildPage1(),
-                  _buildPage2(),
-                  _buildPage3(),
-                ],
-              ),
+              child: _pages.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (i) => setState(() => _currentPage = i),
+                      children: _pages,
+                    ),
             ),
             _buildPageIndicator(),
           ],
