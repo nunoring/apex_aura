@@ -1,5 +1,5 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const OpenAI = require("openai");
+const { OpenAI } = require("openai");
 const cors = require("cors")({ origin: true });
 
 // ─── 금지 단어 목록 ───────────────────────────────────────────
@@ -19,19 +19,17 @@ function containsBanned(text) {
 }
 
 // ─── GPT 시스템 프롬프트 ─────────────────────────────────────
-const SYSTEM_PROMPT = `당신은 전문 이미지 컨설턴트입니다.
-얼굴 사진을 보고 외모를 분석하여 스타일링 솔루션을 제공합니다.
+const SYSTEM_PROMPT = `당신은 전문 패션 & 스타일 컨설턴트입니다.
+사진 속 인물의 현재 헤어스타일, 패션, 그루밍 상태를 보고 스타일링 개선 솔루션을 제공합니다.
 
 ## 분석 철학
 - 외관의 개성과 매력을 중심으로 분석
 - 스타일링(헤어/메이크업/패션)으로 개선 가능한 영역에 집중
 - 피지컬 × 얼굴 × 패션 3박자 조화로 한계치를 넘어서는 접근
 
-## 외모 점수 기준
-- 6점: 일반인 중 눈에 띄는 외관
-- 7점: 가끔 마주칠 수 있는 외관, SNS에서 종종 보이는 유형
-- 8점: 시선을 끄는 고등급 외관 (매우 드묾)
-- 대부분의 일반인은 6~7점대
+## 스타일 완성도 평가 기준
+- 스타일링 완성도, 헤어, 피부 관리 상태, 전체적인 인상을 종합 평가
+- 숫자 점수는 스타일링 개선 가능성을 나타내는 지표로 사용
 
 ## 그루밍 방향성 키워드 (6개 조합)
 분석 대상의 나이/체형/얼굴형을 고려하여 아래 중 가장 어울리는 6개 선택:
@@ -219,8 +217,8 @@ const PRO_SCHEMA_INSTRUCTION = `
 }
 
 모든 숫자 필드는 실제 숫자로. 문자열 필드는 카피 톤 규칙 적용.
-radar 값은 0.0~1.0 범위. appearance_score.score는 6.0~8.0 범위.
-6.0 미만 점수는 절대 반환하지 마세요.`;
+radar 값은 0.0~1.0 범위. scores 각 항목은 0.0~10.0 범위.
+appearance_score.score는 스타일링 완성도 지표로 6.0~8.0 범위.`;
 
 // ─── 메인 함수 ────────────────────────────────────────────────
 exports.analyzeImage = onRequest(
@@ -254,7 +252,14 @@ exports.analyzeImage = onRequest(
         const userPrompt = buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction);
 
         // 1차 시도
-        let result = await callGPT(openai, userPrompt, imgData, mimeType);
+        let result;
+        try {
+          result = await callGPT(openai, userPrompt, imgData, mimeType);
+        } catch (gptErr) {
+          console.log("GPT 거부 또는 파싱 실패 — 폴백 사용:", gptErr.message);
+          result = getFallbackResponse(isPro);
+          return res.status(200).json({ ...result, skinAnalysis: result.scores || {} });
+        }
 
         // 금지 단어 검출 + 재시도 (최대 2회)
         if (containsBanned(JSON.stringify(result))) {
@@ -298,15 +303,15 @@ function buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction)
     ? `\nML Kit 수치: 눈꼬리 ${faceData.eye_angle}° (${faceData.eye_angle_desc}), 얼굴형 ${faceData.face_shape}, 눈간격 ${faceData.eye_gap_desc}, 황금비율 ${faceData.golden_desc}`
     : "";
 
-  return `이 얼굴 사진을 분석해주세요.
+  return `첨부된 사진 속 인물의 현재 스타일을 분석하고 개선 방향을 제안해주세요.
 
-분석 대상: ${genderKo}${animalType ? `, 목표 동물상: ${animalType}` : ""}${faceMetrics}
+분석 대상: ${genderKo}${animalType ? `, 목표 스타일: ${animalType}` : ""}${faceMetrics}
 
-분석 범위:
-- 얼굴형, 이목구비 특징, 피부 상태
-- 현재 헤어스타일이 인상에 미치는 영향
-- 동물상 분류 및 목표 동물상 설정
-- 그루밍/스타일링 방향성
+분석 항목:
+- 현재 헤어스타일 상태 및 개선 방향
+- 피부 관리 상태
+- 그루밍 완성도
+- 패션/스타일링 방향성
 ${isPro ? `- 얼굴 비율 (상/중/하안부 %), 가로세로 비율
 - 외모 점수 (6.0~8.0 범위)
 - 메이크업 4단계 제품 추천
@@ -331,7 +336,7 @@ async function callGPT(openai, userPrompt, imageBase64, mimeType) {
             type: "image_url",
             image_url: {
               url: `data:${mimeType};base64,${imageBase64}`,
-              detail: "high",
+              detail: "auto",
             },
           },
           { type: "text", text: userPrompt },

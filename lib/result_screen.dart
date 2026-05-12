@@ -1242,7 +1242,6 @@ class _ResultScreenState extends State<ResultScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : PageView(
                       controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
                       onPageChanged: (i) => setState(() => _currentPage = i),
                       children: _pages,
                     ),
@@ -1345,9 +1344,20 @@ class _ResultScreenState extends State<ResultScreen> {
   // Page 1: 첫인상 — 사진 크게 + 동물상 판정 카드 + 인상 헤드라인 + 난이도
   Widget _buildPage1() {
     final r = analysisResult;
-    final impression = r['current_impression']?.toString() ?? '';
-    final difficulty = (r['difficulty'] as num?)?.toInt() ?? 3;
-    final currentType = faceData['current_face_type']?.toString() ?? '';
+    // 신 JSON 우선, 구 JSON 폴백
+    final fi = r['first_impression'] as Map<String, dynamic>?;
+    final comparison = r['comparison'] as Map<String, dynamic>?;
+    final impression = r['current_impression']?.toString()
+        ?? fi?['summary']?.toString()
+        ?? comparison?['current_animal']?.toString()
+        ?? '';
+    final gapPercent = (comparison?['gap_percent'] as num?)?.toInt() ?? 50;
+    final difficulty = (r['difficulty'] as num?)?.toInt()
+        ?? (gapPercent > 60 ? 4 : gapPercent > 30 ? 3 : 2);
+    final currentType = faceData['current_face_type']?.toString()
+        ?? comparison?['current_animal']?.toString()
+        ?? fi?['animal_type']?.toString()
+        ?? '';
     final info = _faceTypeInfo[currentType];
     final targetInfo = _faceTypeInfo[animalType];
     final isSameType = currentType == animalType;
@@ -1534,16 +1544,28 @@ class _ResultScreenState extends State<ResultScreen> {
                         fontSize: 15, color: Color(0xFFF0F0F0), fontWeight: FontWeight.w600,
                         height: 1.3)),
                 const SizedBox(height: 3),
-                Text(r['features']?.toString() ?? '',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF555555))),
-                if (r['impression_analysis'] != null) ...[
-                  const SizedBox(height: 10),
-                  Text('→ ${r['impression_analysis']}',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFFA08040), height: 1.5)),
-                ],
+                Text(
+                  r['features']?.toString()
+                    ?? (r['first_impression']?['strengths'] as List?)?.join(' · ')
+                    ?? (r['comparison']?['current_keywords'] as List?)?.join(' · ')
+                    ?? '',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF555555))),
+                Builder(builder: (context) {
+                  final analysis = r['impression_analysis']?.toString()
+                    ?? r['consultant_report_simple']?['direction']?.toString()
+                    ?? r['consultant_report_full']?['direction']?.toString()
+                    ?? '';
+                  if (analysis.isEmpty) return const SizedBox.shrink();
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const SizedBox(height: 10),
+                    Text('→ $analysis', style: const TextStyle(fontSize: 12, color: Color(0xFFA08040), height: 1.5)),
+                  ]);
+                }),
                 const SizedBox(height: 8),
-                Text(r['difficulty_text']?.toString() ?? '',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF666666), height: 1.4)),
+                Text(
+                  r['difficulty_text']?.toString()
+                    ?? '목표까지 $gapPercent% 갭',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF666666), height: 1.4)),
               ],
             ),
           ),
@@ -2192,7 +2214,7 @@ class _ResultScreenState extends State<ResultScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 현실 피드백
-          if (r['realistic_feedback'] != null) ...[
+          if ((r['realistic_feedback'] ?? r['consultant_report_simple']?['quote'] ?? r['consultant_report_full']?['quote']) != null) ...[
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -2213,8 +2235,9 @@ class _ResultScreenState extends State<ResultScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Text(r['realistic_feedback'].toString(),
-                      style: const TextStyle(fontSize: 13, color: Color(0xFFAAAAAA), height: 1.6)),
+                  Text(
+                    (r['realistic_feedback'] ?? r['consultant_report_simple']?['quote'] ?? r['consultant_report_full']?['quote'] ?? '').toString(),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFFAAAAAA), height: 1.6)),
                 ],
               ),
             ),
