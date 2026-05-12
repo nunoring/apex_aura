@@ -1,0 +1,275 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap { display: flex; gap: 24px; justify-content: center; align-items: flex-start; padding: 2rem 0; flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.screen-label { font-size: 11px; color: var(--color-text-tertiary); letter-spacing: 0.05em; }
+.device { width: 300px; background: #1a1a1a; border-radius: 38px; padding: 11px; flex-shrink: 0; }
+.screen { background: #0d0d0d; border-radius: 28px; overflow: hidden; height: 600px; display: flex; flex-direction: column; position: relative; }
+.status { display: flex; justify-content: space-between; padding: 14px 20px 6px; flex-shrink: 0; }
+.status span { font-size: 11px; color: #555; }
+
+/* ── ONBOARDING ── */
+.ob-hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 24px; gap: 0; }
+.ob-icon-ring { width: 88px; height: 88px; border-radius: 24px; background: #1a1a1a; border: 0.5px solid #2a2a2a; display: flex; align-items: center; justify-content: center; margin-bottom: 28px; }
+.ob-icon-ring svg { width: 44px; height: 44px; }
+.ob-title { font-size: 26px; font-weight: 500; color: #f0f0f0; letter-spacing: -0.5px; text-align: center; margin-bottom: 8px; }
+.ob-title span { color: #e8d5b7; }
+.ob-sub { font-size: 13px; color: #555; text-align: center; line-height: 1.6; margin-bottom: 36px; }
+.ob-dots { display: flex; gap: 6px; margin-bottom: 32px; }
+.dot { width: 6px; height: 6px; border-radius: 3px; background: #2a2a2a; }
+.dot.active { width: 20px; background: #e8d5b7; }
+.ob-cards { display: flex; gap: 8px; margin-bottom: 32px; width: 100%; }
+.ob-card { flex: 1; background: #161616; border: 0.5px solid #222; border-radius: 14px; padding: 12px 8px; text-align: center; }
+.ob-card .oc-icon { font-size: 20px; margin-bottom: 6px; display: block; }
+.ob-card .oc-label { font-size: 10px; color: #666; line-height: 1.4; }
+.ob-btn { width: 100%; background: #e8d5b7; color: #1a0f00; border: none; border-radius: 16px; padding: 14px; font-size: 14px; font-weight: 500; }
+.ob-skip { font-size: 12px; color: #444; margin-top: 12px; text-align: center; }
+
+/* ── LOADING ── */
+.ld-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 24px; gap: 0; }
+.ld-face-wrap { position: relative; width: 120px; height: 120px; margin-bottom: 32px; }
+.ld-face-bg { width: 120px; height: 120px; border-radius: 30px; background: #1a1a1a; border: 0.5px solid #2a2a2a; display: flex; align-items: center; justify-content: center; }
+.ld-face-bg svg { width: 56px; height: 56px; stroke: #444; fill: none; stroke-width: 1; }
+.scan-line { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #e8d5b7, transparent); top: 30%; border-radius: 1px; animation: scan 2s ease-in-out infinite; }
+@keyframes scan { 0%,100%{top:10%;opacity:0.3} 50%{top:85%;opacity:1} }
+.dot-ring { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; background: #e8a030; display: flex; align-items: center; justify-content: center; }
+.dot-ring span { font-size: 10px; color: #1a0f00; font-weight: 500; }
+.ld-title { font-size: 18px; color: #f0f0f0; font-weight: 500; margin-bottom: 8px; text-align: center; }
+.ld-sub { font-size: 12px; color: #555; text-align: center; margin-bottom: 32px; }
+.ld-steps { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.ld-step { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #161616; border-radius: 12px; border: 0.5px solid #1e1e1e; }
+.ld-step-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-done { background: #0a1f0a; }
+.step-doing { background: #2a1a00; }
+.step-wait { background: #1a1a1a; }
+.ld-step-icon svg { width: 14px; height: 14px; fill: none; stroke-width: 2; }
+.icon-done { stroke: #27ae60; }
+.icon-doing { stroke: #e8a030; }
+.icon-wait { stroke: #333; }
+.ld-step-text { font-size: 12px; flex: 1; }
+.text-done { color: #27ae60; }
+.text-doing { color: #e8a030; }
+.text-wait { color: #333; }
+.ld-step-badge { font-size: 10px; padding: 2px 8px; border-radius: 6px; flex-shrink: 0; }
+.badge-done { background: #0a1f0a; color: #27ae60; }
+.badge-doing { background: #2a1a00; color: #e8a030; }
+.badge-wait { background: #1a1a1a; color: #333; }
+.progress-bar { width: 100%; height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 24px; }
+.progress-fill { height: 100%; background: #e8d5b7; border-radius: 2px; width: 60%; }
+
+/* ── PAYMENT ── */
+.pay-content { flex: 1; display: flex; flex-direction: column; padding: 0 20px 20px; overflow: hidden; }
+.pay-header { padding: 4px 0 16px; flex-shrink: 0; }
+.pay-header .ph-label { font-size: 11px; color: #555; }
+.pay-header .ph-title { font-size: 18px; color: #f0f0f0; font-weight: 500; margin-top: 2px; }
+.preview-blur { background: #161616; border: 0.5px solid #222; border-radius: 16px; padding: 14px; margin-bottom: 14px; flex-shrink: 0; position: relative; overflow: hidden; }
+.preview-blur::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, #161616 70%); border-radius: 16px; }
+.pb-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.pb-icon { width: 28px; height: 28px; background: #e8d5b7; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.pb-icon svg { width: 14px; height: 14px; stroke: #1a0f00; fill: none; stroke-width: 2; }
+.pb-text { font-size: 12px; color: #888; line-height: 1.5; }
+.pb-text strong { color: #ccc; font-weight: 500; }
+.lock-overlay { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; z-index: 2; }
+.lock-pill { background: #1a1a1a; border: 0.5px solid #333; border-radius: 20px; padding: 6px 14px; display: flex; align-items: center; gap: 6px; }
+.lock-pill svg { width: 12px; height: 12px; stroke: #888; fill: none; stroke-width: 2; }
+.lock-pill span { font-size: 11px; color: #666; }
+.plan-section { flex-shrink: 0; margin-bottom: 14px; }
+.plan-label { font-size: 11px; color: #555; margin-bottom: 8px; }
+.plan-cards { display: flex; gap: 8px; }
+.plan-card { flex: 1; background: #161616; border: 0.5px solid #2a2a2a; border-radius: 14px; padding: 12px 10px; text-align: center; cursor: pointer; }
+.plan-card.active { border-color: #e8d5b7; background: #1e1900; }
+.plan-card .pc-period { font-size: 11px; color: #666; margin-bottom: 4px; }
+.plan-card.active .pc-period { color: #a08060; }
+.plan-card .pc-price { font-size: 16px; color: #ccc; font-weight: 500; }
+.plan-card.active .pc-price { color: #e8d5b7; }
+.plan-card .pc-unit { font-size: 10px; color: #444; margin-top: 2px; }
+.plan-card.active .pc-unit { color: #7a6040; }
+.plan-card .pc-badge { font-size: 9px; background: #e8d5b7; color: #1a0f00; border-radius: 4px; padding: 2px 6px; margin-top: 6px; display: inline-block; }
+.features-list { flex-shrink: 0; margin-bottom: 14px; }
+.feat-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #161616; }
+.feat-item svg { width: 14px; height: 14px; stroke: #e8a030; fill: none; stroke-width: 2; flex-shrink: 0; }
+.feat-item span { font-size: 12px; color: #888; }
+.pay-cta { background: #e8d5b7; color: #1a0f00; border: none; border-radius: 16px; padding: 14px; font-size: 14px; font-weight: 500; width: 100%; flex-shrink: 0; }
+.pay-notice { font-size: 10px; color: #333; text-align: center; margin-top: 8px; flex-shrink: 0; }
+</style>
+
+<h2 class="sr-only">Apex Aura 앱 추가 화면 목업 — 온보딩, 분석 로딩, 결제 화면</h2>
+
+<div class="wrap">
+
+  <!-- 온보딩 -->
+  <div class="col">
+    <p class="screen-label">화면 3 — 온보딩</p>
+    <div class="device">
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="ob-hero">
+          <div class="ob-icon-ring">
+            <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="22" cy="22" r="20" stroke="#e8d5b7" stroke-width="0.8"/>
+              <circle cx="22" cy="16" r="6" stroke="#e8d5b7" stroke-width="1.2"/>
+              <path d="M10 38c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="#e8d5b7" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="ob-title">Apex <span>Aura</span></div>
+          <div class="ob-sub">당신의 얼굴을 분석하고<br>가장 현실적인 개선 방향을 제시합니다</div>
+          <div class="ob-cards">
+            <div class="ob-card">
+              <span class="oc-icon">🔍</span>
+              <span class="oc-label">AI 얼굴<br>정밀 분석</span>
+            </div>
+            <div class="ob-card">
+              <span class="oc-icon">🎯</span>
+              <span class="oc-label">추구미<br>갭 분석</span>
+            </div>
+            <div class="ob-card">
+              <span class="oc-icon">💬</span>
+              <span class="oc-label">현실적<br>피드백</span>
+            </div>
+          </div>
+          <div class="ob-dots">
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+          <button class="ob-btn">시작하기</button>
+          <div class="ob-skip">이미 계정이 있어요</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 로딩 -->
+  <div class="col">
+    <p class="screen-label">화면 4 — 분석 중</p>
+    <div class="device">
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="ld-content">
+          <div class="ld-face-wrap">
+            <div class="ld-face-bg">
+              <svg viewBox="0 0 56 56">
+                <circle cx="28" cy="20" r="12"/>
+                <path d="M8 52c0-11 9-20 20-20s20 9 20 20"/>
+              </svg>
+            </div>
+            <div class="scan-line"></div>
+            <div class="dot-ring"><span>AI</span></div>
+          </div>
+          <div class="ld-title">얼굴 분석 중...</div>
+          <div class="ld-sub">강아지상 기준으로 갭을 계산하고 있어요</div>
+          <div class="ld-steps">
+            <div class="ld-step">
+              <div class="ld-step-icon step-done">
+                <svg viewBox="0 0 14 14"><polyline points="2,7 5,10 12,3" class="icon-done"/></svg>
+              </div>
+              <span class="ld-step-text text-done">얼굴 랜드마크 추출</span>
+              <span class="ld-step-badge badge-done">완료</span>
+            </div>
+            <div class="ld-step">
+              <div class="ld-step-icon step-done">
+                <svg viewBox="0 0 14 14"><polyline points="2,7 5,10 12,3" class="icon-done"/></svg>
+              </div>
+              <span class="ld-step-text text-done">황금비율 수치 계산</span>
+              <span class="ld-step-badge badge-done">완료</span>
+            </div>
+            <div class="ld-step">
+              <div class="ld-step-icon step-doing">
+                <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="4" class="icon-doing"/></svg>
+              </div>
+              <span class="ld-step-text text-doing">추구미 갭 분석</span>
+              <span class="ld-step-badge badge-doing">진행 중</span>
+            </div>
+            <div class="ld-step">
+              <div class="ld-step-icon step-wait">
+                <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="4" class="icon-wait"/></svg>
+              </div>
+              <span class="ld-step-text text-wait">액션 플랜 생성</span>
+              <span class="ld-step-badge badge-wait">대기</span>
+            </div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결제 -->
+  <div class="col">
+    <p class="screen-label">화면 5 — 결제 전환</p>
+    <div class="device">
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="pay-content">
+          <div class="pay-header">
+            <div class="ph-label">잠금 해제</div>
+            <div class="ph-title">맞춤 액션 플랜 전체 보기</div>
+          </div>
+          <div class="preview-blur">
+            <div class="pb-row">
+              <div class="pb-icon">
+                <svg viewBox="0 0 14 14"><path d="M7 1l1.5 4h4l-3 2.5 1 4L7 9l-3.5 2.5 1-4L1 5h4z"/></svg>
+              </div>
+              <div class="pb-text"><strong>헤어컷 추천 3가지</strong><br>투블록 레이어드 / 허쉬컷 / 울프컷 — 눈매 보정 효과 최대화</div>
+            </div>
+            <div class="pb-row">
+              <div class="pb-icon">
+                <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/><path d="M7 4v3l2 1"/></svg>
+              </div>
+              <div class="pb-text"><strong>시술 로드맵</strong><br>비침습 → 최소침습 → 수술 단계별 옵션</div>
+            </div>
+            <div class="lock-overlay">
+              <div class="lock-pill">
+                <svg viewBox="0 0 12 12"><rect x="1" y="5" width="10" height="6" rx="1.5"/><path d="M3 5V3.5a3 3 0 0 1 6 0V5"/></svg>
+                <span>프리미엄 전용 콘텐츠</span>
+              </div>
+            </div>
+          </div>
+          <div class="plan-section">
+            <div class="plan-label">플랜 선택</div>
+            <div class="plan-cards">
+              <div class="plan-card">
+                <div class="pc-period">주간</div>
+                <div class="pc-price">3,900</div>
+                <div class="pc-unit">원 / 주</div>
+              </div>
+              <div class="plan-card active">
+                <div class="pc-period">월간</div>
+                <div class="pc-price">9,900</div>
+                <div class="pc-unit">원 / 월</div>
+                <div class="pc-badge">36% 절약</div>
+              </div>
+              <div class="plan-card">
+                <div class="pc-period">단건</div>
+                <div class="pc-price">4,900</div>
+                <div class="pc-unit">원 / 회</div>
+              </div>
+            </div>
+          </div>
+          <div class="features-list">
+            <div class="feat-item">
+              <svg viewBox="0 0 14 14"><polyline points="2,7 5,10 12,3"/></svg>
+              <span>구체적 헤어컷 스타일 이름 추천</span>
+            </div>
+            <div class="feat-item">
+              <svg viewBox="0 0 14 14"><polyline points="2,7 5,10 12,3"/></svg>
+              <span>시술 로드맵 (침습도 단계별)</span>
+            </div>
+            <div class="feat-item">
+              <svg viewBox="0 0 14 14"><polyline points="2,7 5,10 12,3"/></svg>
+              <span>피부케어 루틴 + 제품 추천</span>
+            </div>
+            <div class="feat-item">
+              <svg viewBox="0 0 14 14"><polyline points="2,7 5,10 12,3"/></svg>
+              <span>대안 추구미 + 전환 플랜</span>
+            </div>
+          </div>
+          <button class="pay-cta">잠금 해제 — 월 9,900원</button>
+          <div class="pay-notice">7일 무료체험 · 언제든 해지 가능 · 자동 갱신</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

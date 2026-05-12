@@ -1,0 +1,345 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .device-wrap {
+    display: flex; gap: 32px; justify-content: center; align-items: flex-start;
+    padding: 2rem 0; flex-wrap: wrap;
+  }
+  .device {
+    width: 320px; background: #1a1a1a; border-radius: 40px;
+    padding: 12px; box-shadow: 0 0 0 0.5px var(--color-border-secondary);
+    flex-shrink: 0;
+  }
+  .screen {
+    background: #0d0d0d; border-radius: 30px; overflow: hidden;
+    height: 640px; position: relative; display: flex; flex-direction: column;
+  }
+  .screen-label {
+    font-size: 11px; color: var(--color-text-tertiary); text-align: center;
+    margin-bottom: 8px; letter-spacing: 0.05em;
+  }
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px 8px; flex-shrink: 0;
+  }
+  .status-bar span { font-size: 11px; color: #888; }
+
+  .screen1-content { flex: 1; display: flex; flex-direction: column; padding: 0 20px 24px; overflow: hidden; }
+  .logo-area { text-align: center; padding: 16px 0 24px; }
+  .logo-area .app-name { font-size: 22px; font-weight: 500; color: #f0f0f0; letter-spacing: -0.5px; }
+  .logo-area .app-sub { font-size: 12px; color: #666; margin-top: 4px; }
+
+  .upload-zone {
+    background: #1c1c1c; border: 0.5px dashed #333; border-radius: 20px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 28px; flex-shrink: 0;
+  }
+  .cam-icon {
+    width: 48px; height: 48px; background: #2a2a2a; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cam-icon svg { width: 24px; height: 24px; stroke: #888; fill: none; stroke-width: 1.5; }
+  .upload-zone .uz-title { font-size: 14px; color: #ccc; font-weight: 500; }
+  .upload-zone .uz-sub { font-size: 11px; color: #555; text-align: center; line-height: 1.5; }
+
+  .divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; flex-shrink: 0; }
+  .divider-line { flex: 1; height: 0.5px; background: #222; }
+  .divider span { font-size: 11px; color: #444; }
+
+  .type-section { flex-shrink: 0; }
+  .type-section .sec-label { font-size: 11px; color: #555; margin-bottom: 10px; letter-spacing: 0.04em; }
+  .type-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+  .type-card {
+    background: #1c1c1c; border: 0.5px solid #2a2a2a; border-radius: 14px;
+    padding: 10px 14px; cursor: pointer; flex: 1; min-width: 68px; text-align: center;
+    transition: all 0.15s;
+  }
+  .type-card.active { background: #e8d5b7; border-color: #e8d5b7; }
+  .type-card .tc-emoji { font-size: 20px; display: block; margin-bottom: 4px; }
+  .type-card .tc-name { font-size: 10px; color: #888; }
+  .type-card.active .tc-name { color: #5a3a1a; }
+
+  .slider-section { flex-shrink: 0; margin-top: 16px; }
+  .slider-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .slider-row span { font-size: 11px; color: #555; }
+  .slider-track {
+    width: 100%; height: 4px; background: #222; border-radius: 2px; position: relative; margin-bottom: 4px;
+  }
+  .slider-fill { height: 100%; background: #e8d5b7; border-radius: 2px; width: 35%; }
+  .slider-thumb {
+    width: 16px; height: 16px; background: #e8d5b7; border-radius: 50%;
+    position: absolute; top: -6px; left: 33%; border: 2px solid #0d0d0d;
+  }
+  .slider-labels { display: flex; justify-content: space-between; }
+  .slider-labels span { font-size: 10px; color: #444; }
+
+  .cta-btn {
+    background: #e8d5b7; color: #1a0f00; border-radius: 16px; border: none;
+    padding: 14px; font-size: 14px; font-weight: 500; cursor: pointer;
+    width: 100%; margin-top: auto; flex-shrink: 0;
+  }
+
+  .screen2-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .result-header { padding: 12px 20px 8px; flex-shrink: 0; }
+  .result-header .rh-label { font-size: 11px; color: #555; }
+  .result-header .rh-title { font-size: 18px; color: #f0f0f0; font-weight: 500; margin-top: 2px; }
+
+  .face-card {
+    margin: 0 20px 12px; background: #1c1c1c; border-radius: 20px;
+    padding: 16px; flex-shrink: 0; border: 0.5px solid #2a2a2a;
+  }
+  .face-row { display: flex; align-items: center; gap: 12px; }
+  .face-avatar {
+    width: 52px; height: 52px; background: #2a2a2a; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .face-avatar svg { width: 28px; height: 28px; stroke: #666; fill: none; stroke-width: 1.2; }
+  .face-info { flex: 1; }
+  .face-info .fi-type { font-size: 13px; color: #ccc; font-weight: 500; }
+  .face-info .fi-sub { font-size: 11px; color: #555; margin-top: 2px; }
+  .difficulty-badge {
+    background: #2a1a00; border: 0.5px solid #5a3a00; border-radius: 8px;
+    padding: 4px 10px; font-size: 11px; color: #e8a030; flex-shrink: 0;
+  }
+
+  .stars-row { display: flex; gap: 3px; margin-top: 10px; }
+  .star { width: 14px; height: 14px; }
+  .star-fill { fill: #e8a030; }
+  .star-empty { fill: #2a2a2a; }
+
+  .gap-table { margin: 0 20px 12px; flex-shrink: 0; }
+  .gap-table .gt-title { font-size: 11px; color: #555; margin-bottom: 8px; }
+  .gap-row {
+    display: flex; align-items: center; padding: 8px 0;
+    border-bottom: 0.5px solid #1c1c1c; gap: 8px;
+  }
+  .gap-row .gr-label { font-size: 12px; color: #888; flex: 1; }
+  .gap-row .gr-bar-wrap { width: 80px; height: 4px; background: #1c1c1c; border-radius: 2px; }
+  .gap-row .gr-bar { height: 100%; border-radius: 2px; }
+  .bar-hard { background: #c0392b; width: 85%; }
+  .bar-mid { background: #e8a030; width: 55%; }
+  .bar-easy { background: #27ae60; width: 30%; }
+  .gap-row .gr-tag { font-size: 10px; padding: 2px 8px; border-radius: 6px; flex-shrink: 0; }
+  .tag-hard { background: #2a0a0a; color: #c0392b; }
+  .tag-mid { background: #2a1a00; color: #e8a030; }
+  .tag-easy { background: #0a1f0a; color: #27ae60; }
+
+  .lock-section {
+    margin: 0 20px; background: #1c1c1c; border-radius: 20px;
+    padding: 16px; border: 0.5px solid #2a2a2a; flex-shrink: 0;
+  }
+  .lock-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .lock-icon { width: 20px; height: 20px; background: #e8d5b7; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .lock-icon svg { width: 11px; height: 11px; stroke: #1a0f00; fill: none; stroke-width: 2; }
+  .lock-header span { font-size: 13px; color: #ccc; font-weight: 500; }
+  .lock-items { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .lock-item { display: flex; align-items: center; gap: 8px; }
+  .lock-item .li-blur {
+    font-size: 12px; color: transparent; background: #2a2a2a;
+    border-radius: 4px; padding: 2px 0; flex: 1; user-select: none;
+  }
+  .lock-item svg { width: 14px; height: 14px; stroke: #444; fill: none; stroke-width: 1.5; flex-shrink: 0; }
+  .unlock-btn {
+    background: #e8d5b7; color: #1a0f00; border: none; border-radius: 12px;
+    padding: 10px; font-size: 13px; font-weight: 500; width: 100%; cursor: pointer;
+  }
+
+  .nav-bar {
+    display: flex; padding: 10px 30px 16px; border-top: 0.5px solid #1a1a1a;
+    gap: 0; flex-shrink: 0; background: #0d0d0d;
+  }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-item svg { width: 20px; height: 20px; stroke: #444; fill: none; stroke-width: 1.5; }
+  .nav-item.active svg { stroke: #e8d5b7; }
+  .nav-item span { font-size: 9px; color: #444; }
+  .nav-item.active span { color: #e8d5b7; }
+</style>
+
+<h2 class="sr-only">Looksmax AI 앱 UI 목업 — 셀카 분석 화면과 결과 화면 2개 화면 구성</h2>
+
+<div class="device-wrap">
+
+  <div>
+    <p class="screen-label">화면 1 — 셀카 + 추구미 설정</p>
+    <div class="device">
+      <div class="screen">
+        <div class="status-bar">
+          <span>9:41</span>
+          <span>●●●</span>
+        </div>
+
+        <div class="screen1-content">
+          <div class="logo-area">
+            <div class="app-name">LOOKSMAX</div>
+            <div class="app-sub">AI 외모 분석 · 남성 전용</div>
+          </div>
+
+          <div class="upload-zone">
+            <div class="cam-icon">
+              <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <div class="uz-title">셀카 찍기 또는 업로드</div>
+            <div class="uz-sub">정면 사진 권장<br>밝은 환경에서 찍으면 더 정확해요</div>
+          </div>
+
+          <div class="divider">
+            <div class="divider-line"></div>
+            <span>추구미 설정</span>
+            <div class="divider-line"></div>
+          </div>
+
+          <div class="type-section">
+            <div class="sec-label">동물상 선택</div>
+            <div class="type-cards">
+              <div class="type-card active">
+                <span class="tc-emoji">🐶</span>
+                <span class="tc-name">강아지</span>
+              </div>
+              <div class="type-card">
+                <span class="tc-emoji">🐱</span>
+                <span class="tc-name">고양이</span>
+              </div>
+              <div class="type-card">
+                <span class="tc-emoji">🐻</span>
+                <span class="tc-name">곰</span>
+              </div>
+              <div class="type-card">
+                <span class="tc-emoji">🐺</span>
+                <span class="tc-name">늑대</span>
+              </div>
+              <div class="type-card">
+                <span class="tc-emoji">🦊</span>
+                <span class="tc-name">여우</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="slider-section">
+            <div class="slider-row">
+              <span>인상 조절</span>
+              <span style="color:#888; font-size:11px;">초식계 쪽</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill"></div>
+              <div class="slider-thumb"></div>
+            </div>
+            <div class="slider-labels">
+              <span>초식계</span>
+              <span>중간</span>
+              <span>육식계</span>
+            </div>
+          </div>
+
+          <div style="flex:1; min-height:12px;"></div>
+          <button class="cta-btn">분석 시작하기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="screen-label">화면 2 — 분석 결과 (무료 구간)</p>
+    <div class="device">
+      <div class="screen">
+        <div class="status-bar">
+          <span>9:41</span>
+          <span>●●●</span>
+        </div>
+
+        <div class="screen2-content">
+          <div class="result-header">
+            <div class="rh-label">분석 완료</div>
+            <div class="rh-title">강아지상 · 초식계</div>
+          </div>
+
+          <div class="face-card">
+            <div class="face-row">
+              <div class="face-avatar">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg>
+              </div>
+              <div class="face-info">
+                <div class="fi-type">현재 인상 — 온화한 초식계</div>
+                <div class="fi-sub">눈꼬리 하향 · 넓은 미간 · 부드러운 턱선</div>
+              </div>
+              <div class="difficulty-badge">★★★★☆</div>
+            </div>
+            <div class="stars-row">
+              <svg class="star" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" class="star-fill"/></svg>
+              <svg class="star" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" class="star-fill"/></svg>
+              <svg class="star" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" class="star-fill"/></svg>
+              <svg class="star" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" class="star-fill"/></svg>
+              <svg class="star" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" class="star-empty"/></svg>
+              <span style="font-size:11px; color:#555; margin-left:6px;">달성 난이도 높음</span>
+            </div>
+          </div>
+
+          <div class="gap-table">
+            <div class="gt-title">갭 분석 — 항목별 현황</div>
+            <div class="gap-row">
+              <span class="gr-label">눈꼬리 각도</span>
+              <div class="gr-bar-wrap"><div class="gr-bar bar-hard"></div></div>
+              <span class="gr-tag tag-hard">골격 요인</span>
+            </div>
+            <div class="gap-row">
+              <span class="gr-label">헤어스타일</span>
+              <div class="gr-bar-wrap"><div class="gr-bar bar-easy"></div></div>
+              <span class="gr-tag tag-easy">바로 가능</span>
+            </div>
+            <div class="gap-row">
+              <span class="gr-label">피부 상태</span>
+              <div class="gr-bar-wrap"><div class="gr-bar bar-mid"></div></div>
+              <span class="gr-tag tag-mid">관리 필요</span>
+            </div>
+            <div class="gap-row">
+              <span class="gr-label">눈썹 형태</span>
+              <div class="gr-bar-wrap"><div class="gr-bar bar-easy"></div></div>
+              <span class="gr-tag tag-easy">바로 가능</span>
+            </div>
+          </div>
+
+          <div class="lock-section">
+            <div class="lock-header">
+              <div class="lock-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <span>맞춤 액션 플랜 — 프리미엄</span>
+            </div>
+            <div class="lock-items">
+              <div class="lock-item">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div class="li-blur">헤어컷 스타일 3가지 추천 — 투블록 vs 레이어드</div>
+              </div>
+              <div class="lock-item">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div class="li-blur">피부 루틴 단계별 + 제품 추천</div>
+              </div>
+              <div class="lock-item">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div class="li-blur">시술 추천 — 비침습부터 수술까지</div>
+              </div>
+            </div>
+            <button class="unlock-btn">잠금 해제 — 주 3,900원</button>
+          </div>
+
+          <div style="flex:1;"></div>
+        </div>
+
+        <div class="nav-bar">
+          <div class="nav-item active">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>분석</span>
+          </div>
+          <div class="nav-item">
+            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span>홈</span>
+          </div>
+          <div class="nav-item">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>내정보</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
