@@ -185,6 +185,14 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _selectedImages.removeAt(index));
   }
 
+  void _resetInputForm() {
+    setState(() {
+      _selectedImages.clear();
+      _selectedAnimal = -1;
+      _gender = '';
+    });
+  }
+
   Widget _buildPhotoSection() {
     final count = _selectedImages.length;
     final accuracyColor = count == 0 ? const Color(0xFF333333) : _accuracyColors[count];
@@ -690,8 +698,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 54,
                 child: ElevatedButton(
                   onPressed: (_selectedImages.isNotEmpty && _selectedAnimal != -1 && _gender.isNotEmpty)
-                      ? () {
-                          Navigator.push(
+                      ? () async {
+                          final shouldRefresh = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => LoadingScreen(
@@ -702,6 +710,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           );
+                          if (shouldRefresh == true && mounted) {
+                            _resetInputForm();
+                            _loadHistory();
+                          }
                         }
                       : null,
                   style: ElevatedButton.styleFrom(

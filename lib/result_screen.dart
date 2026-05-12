@@ -194,7 +194,12 @@ class _ResultScreenState extends State<ResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) Navigator.pop(context, true);
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
       body: SafeArea(
         child: Column(
@@ -226,7 +231,8 @@ class _ResultScreenState extends State<ResultScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildHeader() {
@@ -1497,7 +1503,7 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(height: 16),
           // 재분석 CTA — 결과 마지막 전환 유도
           GestureDetector(
-            onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
+            onTap: () => Navigator.pop(context, true),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
