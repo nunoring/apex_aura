@@ -63,9 +63,9 @@ class _ResultScreenState extends State<ResultScreen> {
 
   List<Widget> _buildFreePages() => [
     _buildPage1(),
-    _buildPage2(),
-    _buildGapPage(),
-    _buildPage3(),
+    _buildPage2Free(),
+    _buildPage3Free(),
+    _buildPage4Free(),
   ];
 
   List<Widget> _buildProPages() => [
@@ -92,6 +92,336 @@ class _ResultScreenState extends State<ResultScreen> {
         ],
       ),
     );
+  }
+
+  // Free Page 2: 수치 분석 (구독 체크 없음)
+  Widget _buildPage2Free() {
+    return _buildPage2();
+  }
+
+  // Free Page 3: 갭 분석
+  Widget _buildPage3Free() {
+    final r = analysisResult;
+    final comparison = r['comparison'] as Map<String, dynamic>?;
+    final report = r['consultant_report'] as Map<String, dynamic>?;
+    final gapPercent = (comparison?['gap_percent'] as num?)?.toDouble() ?? 50.0;
+    final currentAnimal = comparison?['current_animal']?.toString() ?? '';
+    final targetAnimal = comparison?['target_animal']?.toString() ?? widget.animalType;
+    final currentKw = List<String>.from(comparison?['current_keywords'] ?? []);
+    final targetKw = List<String>.from(comparison?['target_keywords'] ?? []);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // AnimalCompareCard
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('현재', style: TextStyle(fontSize: 10, color: Color(0xFF555555))),
+                      const SizedBox(height: 4),
+                      Text(currentAnimal,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFFE8D5B7))),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 4, runSpacing: 4,
+                        children: currentKw.map((kw) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A1A),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
+                          ),
+                          child: Text(kw, style: const TextStyle(fontSize: 10, color: Color(0xFF888888))),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(Icons.arrow_forward, size: 16, color: Color(0xFF444444)),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('목표', style: TextStyle(fontSize: 10, color: Color(0xFF555555))),
+                      const SizedBox(height: 4),
+                      Text(targetAnimal,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFFE8A030))),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 4, runSpacing: 4, alignment: WrapAlignment.end,
+                        children: targetKw.map((kw) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1500),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF2A2000), width: 0.5),
+                          ),
+                          child: Text(kw, style: const TextStyle(fontSize: 10, color: Color(0xFFE8A030))),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // GapProgressBar
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Text('갭 거리', style: TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                  const Spacer(),
+                  Text('${gapPercent.round()}%', style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w700)),
+                ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: gapPercent / 100,
+                    backgroundColor: const Color(0xFF222222),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      gapPercent > 60 ? const Color(0xFFC0392B) : gapPercent > 30 ? const Color(0xFFE8A030) : const Color(0xFF27AE60),
+                    ),
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  gapPercent > 60 ? '목표까지 큰 변화가 필요해요' : gapPercent > 30 ? '스타일링으로 충분히 도달할 수 있어요' : '현재와 목표가 가까워요',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ConsultantReport
+          if (report != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: const [
+                    Icon(Icons.person_outline, size: 14, color: Color(0xFFE8A030)),
+                    SizedBox(width: 6),
+                    Text('컨설턴트 리포트', style: TextStyle(fontSize: 12, color: Color(0xFFE8A030), fontWeight: FontWeight.w600)),
+                  ]),
+                  const SizedBox(height: 10),
+                  if (report['quote'] != null)
+                    Text('"${report['quote']}"',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontStyle: FontStyle.italic, height: 1.5)),
+                  if (report['gap'] != null) ...[
+                    const SizedBox(height: 10),
+                    Text(report['gap'].toString(),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+                  ],
+                  if (report['direction'] != null) ...[
+                    const SizedBox(height: 6),
+                    Text(report['direction'].toString(),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA), height: 1.5)),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Free Page 4: 변신 플랜 + Pro 후크
+  Widget _buildPage4Free() {
+    final r = analysisResult;
+    final actionCards = (r['action_cards'] as List?) ?? [];
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 90,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('변신 플랜', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+
+          // 액션 카드 3개
+          ...actionCards.map((card) {
+            final c = card as Map<String, dynamic>;
+            final refs = (c['references'] as List?) ?? [];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(c['category']?.toString() ?? '',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFFE8A030), fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  if (c['observation'] != null)
+                    Text(c['observation'].toString(),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+                  if (c['application'] != null) ...[
+                    const SizedBox(height: 6),
+                    Text(c['application'].toString(),
+                        style: const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC), height: 1.5)),
+                  ],
+                  if (refs.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6, runSpacing: 4,
+                      children: refs.map((ref) {
+                        final rm = ref as Map;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A1A),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
+                          ),
+                          child: Text('${rm['name']} · ${rm['context']}',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(height: 16),
+
+          // Pro 잠금 티저
+          GestureDetector(
+            onTap: _showPaywall,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1200),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE8A030).withAlpha(60), width: 1),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline, size: 20, color: Color(0xFFE8A030)),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Pro 전용 — 6가지 심층 분석',
+                            style: TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                        SizedBox(height: 3),
+                        Text('외모 점수 · 메이크업 · 패션 룩 · 90일 마일스톤',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF888866))),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 18, color: Color(0xFFE8A030)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Free 안내 문구
+          const Center(
+            child: Text('무료 분석 · 상세 결과는 Pro에서 확인하세요',
+                style: TextStyle(fontSize: 11, color: Color(0xFF444444))),
+          ),
+          const SizedBox(height: 24),
+
+          // CTA 버튼들
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: _shareResult,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.share_outlined, size: 16, color: Color(0xFF888888)),
+                        SizedBox(width: 6),
+                        Text('공유', style: TextStyle(fontSize: 13, color: Color(0xFF888888))),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context, true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8D5B7),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.refresh, size: 16, color: Color(0xFF1A0F00)),
+                        SizedBox(width: 6),
+                        Text('다시 분석', style: TextStyle(fontSize: 13, color: Color(0xFF1A0F00), fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPaywall() async {
+    final ok = await PaywallBottomSheet.show(context);
+    if (ok && mounted) _initPageFlow();
   }
 
   Widget _buildGapPage() {
