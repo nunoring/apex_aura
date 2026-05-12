@@ -1202,105 +1202,129 @@ class _ResultScreenState extends State<ResultScreen> {
           ],
 
 
-          // 맞춤 액션 플랜 탭
-          if (curriculum != null) ...[
-            const Text('맞춤 액션 플랜',
-                style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+          // 변신 액션 플랜
+          Builder(builder: (context) {
+            final diagnosis = r['diagnosis'] as String?;
+            final targetDesc = r['target_description'] as String?;
+            final actionPlan = (r['action_plan'] as List?)
+                ?.map((e) => e as Map<String, dynamic>)
+                .toList();
+            final expectedEffect = r['expected_effect'] as String?;
 
-            // 탭 선택 (헤어 = 무료, 나머지 = Pro 잠금)
-            Row(
-              children: tabs.asMap().entries.map((e) {
-                final i = e.key;
-                final tab = e.value;
-                final isSelected = i == _curriculumTab;
-                final hasData = curriculum[tab.key] != null;
-                final isLocked = i > 0 && !_isSubscribed;
-                return GestureDetector(
-                  onTap: () async {
-                    if (isLocked) {
-                      final ok = await PaywallBottomSheet.show(context);
-                      if (ok && mounted) {
-                        setState(() {
-                          _isSubscribed = true;
-                          _curriculumTab = i;
-                        });
-                      }
-                    } else if (hasData) {
-                      setState(() => _curriculumTab = i);
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isLocked
-                          ? const Color(0xFF111111)
-                          : isSelected ? const Color(0xFF2A2000) : const Color(0xFF141414),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isLocked
-                            ? const Color(0xFF1E1E1E)
-                            : isSelected ? const Color(0xFFE8A030) : const Color(0xFF222222),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isLocked ? Icons.lock : tab.icon,
-                          size: 12,
-                          color: isLocked
-                              ? const Color(0xFF3A3A3A)
-                              : isSelected ? const Color(0xFFE8A030)
-                                  : hasData ? const Color(0xFF555555) : const Color(0xFF333333),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          tab.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isLocked
-                                ? const Color(0xFF3A3A3A)
-                                : isSelected ? const Color(0xFFE8A030)
-                                    : hasData ? const Color(0xFF666666) : const Color(0xFF333333),
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-
-            // 선택된 탭 콘텐츠
-            Builder(builder: (context) {
-              if (_curriculumTab >= tabs.length) return const SizedBox.shrink();
-              final currentTab = tabs[_curriculumTab];
-              final isCurrentLocked = _curriculumTab > 0 && !_isSubscribed;
-              if (isCurrentLocked) {
-                return _buildLockedPlanCard(
-                  icon: currentTab.icon,
-                  label: currentTab.label,
-                  onUnlock: () async {
-                    final ok = await PaywallBottomSheet.show(context);
-                    if (ok && mounted) setState(() => _isSubscribed = true);
-                  },
-                );
-              }
-              final data = curriculum[currentTab.key];
-              if (data == null) return const SizedBox.shrink();
-              return _buildBeforeAfterCard(
-                icon: currentTab.icon,
-                data: data as Map<String, dynamic>,
+            if (actionPlan != null && actionPlan.isNotEmpty) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (diagnosis != null) ...[
+                    _buildInfoCard('현재 상태 진단', diagnosis),
+                    const SizedBox(height: 10),
+                  ],
+                  if (targetDesc != null) ...[
+                    _buildInfoCard('목표 이미지', targetDesc),
+                    const SizedBox(height: 16),
+                  ],
+                  const Text('변신 액션 플랜',
+                      style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  ...actionPlan.map(_buildActionCard),
+                  if (expectedEffect != null) ...[
+                    const SizedBox(height: 4),
+                    _buildInfoCard('예상 효과', expectedEffect),
+                  ],
+                  const SizedBox(height: 20),
+                ],
               );
-            }),
-          ],
-          const SizedBox(height: 20),
+            }
+
+            // 폴백: 기존 curriculum 렌더링
+            if (curriculum == null) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('맞춤 액션 플랜',
+                    style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                ...tabs.asMap().entries.map((e) {
+                  final data = curriculum[e.value.key];
+                  if (data == null) return const SizedBox.shrink();
+                  return _buildBeforeAfterCard(icon: e.value.icon, data: data as Map<String, dynamic>);
+                }),
+                const SizedBox(height: 20),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(Map<String, dynamic> plan) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            plan['category'] ?? '',
+            style: const TextStyle(
+              color: Color(0xFFE8A030),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            plan['current_problem'] ?? '',
+            style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13, height: 1.6),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            plan['recommendation'] ?? '',
+            style: const TextStyle(color: Color(0xFFCCCCCC), fontSize: 13, height: 1.6),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            plan['examples'] ?? '',
+            style: const TextStyle(color: Color(0xFF888888), fontSize: 12, height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String title, String content) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFFE8D5B7),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13, height: 1.6),
+          ),
         ],
       ),
     );

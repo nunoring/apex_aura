@@ -130,7 +130,7 @@ exports.analyzeImage = onRequest(async (req, res) => {
       },
       body: JSON.stringify({
         model: "gpt-4o",
-        max_tokens: 2800,
+        max_tokens: 3500,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -197,6 +197,14 @@ ${isFemale
 - 광대 축소술: 넓은 광대 개선, 얼굴 갸름해 보임, 비용 300~500만원
 - 앞트임: 눈 간격 넓어 보이는 효과, 회복 1주일
 - 피부과 레이저(토닝): 잡티/모공/피부결 개선, 비용 5~15만원/회, 효과 누적
+
+action_plan 작성 규칙 (3개 항목 필수):
+- current_problem: 사진에서 실제로 관찰된 문제점 구체적으로 서술 (📌 접두사 포함)
+- recommendation: 왜 효과적인지 메커니즘 설명 포함 (💡 접두사 포함)
+- examples: 한국 셀럽/스타일명 2-3개 구체적으로 (🎯 접두사 포함)
+- 남성이면 category[2]는 "그루밍/액세서리", 여성이면 "메이크업/액세서리"
+- 추상적 단어("세련된", "깔끔한") 사용 시 반드시 구체적 설명 동반
+- 부정적 단어("못생겼다", "단점") 금지 → "개선 포인트", "아쉬운 부분" 사용
 
 gap_analysis 작성 규칙 (절대 예시값 복사 금지):
 - score: 0.0(목표와 거의 일치)~1.0(매우 큰 차이), 실제 분석 기반 수치
@@ -301,7 +309,30 @@ ${currentFaceType ? `## 현재 동물상 (ML Kit 수치로 수학적 결정, 변
         {"name": "제품 유형명", "key_ingredient": "핵심 성분/특징", "price_range": "가격대", "priority": "high"}
       ]
     }
-  ]
+  ],
+  "diagnosis": "현재 외모가 주는 구체적 인상 + 강점 1개 + 개선 포인트 1개 (2-3문장)",
+  "target_description": "목표 ${animalType}의 핵심 매력 1-2개 + 현재 골격에 이 방향이 적합한 이유 (2문장)",
+  "action_plan": [
+    {
+      "category": "헤어스타일",
+      "current_problem": "📌 사진에서 관찰된 현재 헤어 문제점 (구체적으로)",
+      "recommendation": "💡 추천 방향 + 왜 효과적인지 메커니즘",
+      "examples": "🎯 셀럽/스타일명 2-3개 (예: 차은우 센터파트, 뷔 허쉬컷)"
+    },
+    {
+      "category": "패션/스타일링",
+      "current_problem": "📌 현재 스타일링에서 개선할 포인트",
+      "recommendation": "💡 추천 방향 + 메커니즘",
+      "examples": "🎯 구체적 스타일/브랜드 예시 2-3개"
+    },
+    {
+      "category": "${isFemale ? '메이크업/액세서리' : '그루밍/액세서리'}",
+      "current_problem": "📌 현재 그루밍/메이크업 개선 포인트",
+      "recommendation": "💡 추천 방향 + 메커니즘",
+      "examples": "🎯 구체적 예시 2-3개"
+    }
+  ],
+  "expected_effect": "이 플랜 실천 시 어떤 인상 변화가 일어나는지 + 동기부여 멘트 (과장 금지, 2문장)"
 }`
           }
         ]
@@ -309,7 +340,14 @@ ${currentFaceType ? `## 현재 동물상 (ML Kit 수치로 수학적 결정, 변
     });
 
     const step2Data = await step2.json();
-    const result = JSON.parse(step2Data.choices[0].message.content);
+    let result;
+    try {
+      const cleaned = step2Data.choices[0].message.content.replace(/```json|```/g, '').trim();
+      result = JSON.parse(cleaned);
+    } catch (e) {
+      console.error('JSON 파싱 실패:', e);
+      throw new Error('분석 결과 파싱 오류');
+    }
 
     res.json({ ...result, skinAnalysis });
 
