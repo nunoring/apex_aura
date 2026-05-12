@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
@@ -69,13 +70,579 @@ class _ResultScreenState extends State<ResultScreen> {
   ];
 
   List<Widget> _buildProPages() => [
-    _buildPage1(),
-    _buildPage2(),
-    _buildGapPage(),
-    _buildPage3(),
-    _buildPlaceholderPage('메이크업', Icons.face_retouching_natural),
-    _buildPlaceholderPage('패션 룩', Icons.checkroom_outlined),
+    _buildPage1Pro(),
+    _buildPage2Pro(),
+    _buildPage3Pro(),
+    _buildPage4Pro(),
+    _buildPage5Pro(),
+    _buildPage6Pro(),
   ];
+
+  // ─── Pro Page 1: 첫인상 강화 ──────────────────────────────────────
+  Widget _buildPage1Pro() {
+    final faceAnalysis = analysisResult['face_analysis'] as Map<String, dynamic>?;
+    return Stack(
+      children: [
+        _buildPage1(),
+        if (faceAnalysis != null)
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: _buildFaceRatioCard(faceAnalysis),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFaceRatioCard(Map<String, dynamic> fa) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('얼굴 비율 진단', style: TextStyle(color: Color(0xFFE8D5B7), fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _ratioItem('상안부', '${fa['top_face_percent'] ?? '-'}%'),
+              _ratioItem('중안부', '${fa['middle_face_percent'] ?? '-'}%'),
+              _ratioItem('하안부', '${fa['bottom_face_percent'] ?? '-'}%'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ratioItem(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFE8D5B7))),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF666666))),
+      ],
+    );
+  }
+
+  // ─── Pro Page 2: 외모 점수 ────────────────────────────────────────
+  Widget _buildPage2Pro() {
+    final s = _abilityScores;
+    final appearanceScore = analysisResult['appearance_score'] as Map<String, dynamic>?;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 총점 카드
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Text('${appearanceScore?['score'] ?? s.total}',
+                        style: TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: s.tierColor)),
+                    const Text(' / 100', style: TextStyle(fontSize: 18, color: Color(0xFF444444))),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: s.tierColor.withAlpha(30),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: s.tierColor.withAlpha(80), width: 0.5),
+                      ),
+                      child: Text(s.tier, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: s.tierColor)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  appearanceScore?['tier_description']?.toString() ?? s.tagline,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
+                ),
+                if (appearanceScore != null) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: _proScoreMini('현재 한계', '${appearanceScore['current_limit'] ?? '-'}')),
+                    Expanded(child: _proScoreMini('최적화 시', '${appearanceScore['optimized_limit'] ?? '-'}')),
+                  ]),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 항목별 점수 바
+          ...s.stats.map((stat) {
+            final label = stat.$1;
+            final score = stat.$2;
+            final color = score >= 70 ? const Color(0xFF27AE60) : score >= 50 ? const Color(0xFFE8A030) : const Color(0xFFC0392B);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA))),
+                    const Spacer(),
+                    Text('$score', style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+                  ]),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: score / 100,
+                      backgroundColor: const Color(0xFF222222),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _proScoreMini(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFE8D5B7))),
+        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF555555))),
+      ],
+    );
+  }
+
+  // ─── Pro Page 3: 갭 분석 + 레이더 차트 ───────────────────────────
+  Widget _buildPage3Pro() {
+    final r = analysisResult;
+    final comparison = r['comparison'] as Map<String, dynamic>?;
+    final radar = r['radar'] as Map<String, dynamic>?;
+    final report = r['consultant_report'] as Map<String, dynamic>?;
+    final currentKw = List<String>.from(comparison?['current_keywords'] ?? []);
+    final targetKw = List<String>.from(comparison?['target_keywords'] ?? []);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // AnimalCompareCard (Free 버전 재사용)
+          _buildPage3Free(),
+          if (radar != null) ...[
+            const SizedBox(height: 16),
+            const Text('능력치 레이더', style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
+            const SizedBox(height: 12),
+            _buildRadarChart(radar),
+          ],
+          if (report != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: const [
+                    Icon(Icons.person_outline, size: 14, color: Color(0xFFE8A030)),
+                    SizedBox(width: 6),
+                    Text('컨설턴트 풀 리포트', style: TextStyle(fontSize: 12, color: Color(0xFFE8A030), fontWeight: FontWeight.w600)),
+                  ]),
+                  const SizedBox(height: 10),
+                  if (report['quote'] != null)
+                    Text('"${report['quote']}"',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontStyle: FontStyle.italic, height: 1.5)),
+                  const SizedBox(height: 8),
+                  if (report['observation'] != null)
+                    _reportRow('관찰', report['observation'].toString()),
+                  if (report['impact'] != null)
+                    _reportRow('인상', report['impact'].toString()),
+                  if (report['gap'] != null)
+                    _reportRow('갭', report['gap'].toString()),
+                  if (report['direction'] != null)
+                    _reportRow('방향', report['direction'].toString()),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _reportRow(String label, String content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 36, child: Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF555555)))),
+          Expanded(child: Text(content, style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA), height: 1.5))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRadarChart(Map<String, dynamic> radar) {
+    final current = (radar['current'] as Map<String, dynamic>? ?? {});
+    final target = (radar['target'] as Map<String, dynamic>? ?? {});
+    final keys = current.keys.toList();
+    if (keys.isEmpty) return const SizedBox.shrink();
+
+    List<RadarDataSet> dataSets = [
+      RadarDataSet(
+        fillColor: const Color(0xFFE8A030).withAlpha(40),
+        borderColor: const Color(0xFFE8A030),
+        borderWidth: 1.5,
+        entryRadius: 3,
+        dataEntries: keys.map((k) => RadarEntry(value: ((current[k] as num?)?.toDouble() ?? 0.5) * 10)).toList(),
+      ),
+      RadarDataSet(
+        fillColor: const Color(0xFF4A90D9).withAlpha(25),
+        borderColor: const Color(0xFF4A90D9),
+        borderWidth: 1.5,
+        entryRadius: 3,
+        dataEntries: keys.map((k) => RadarEntry(value: ((target[k] as num?)?.toDouble() ?? 0.8) * 10)).toList(),
+      ),
+    ];
+
+    return SizedBox(
+      height: 220,
+      child: RadarChart(
+        RadarChartData(
+          dataSets: dataSets,
+          radarBackgroundColor: Colors.transparent,
+          borderData: FlBorderData(show: false),
+          radarBorderData: const BorderSide(color: Color(0xFF2A2A2A), width: 0.5),
+          titleTextStyle: const TextStyle(color: Color(0xFF666666), fontSize: 11),
+          getTitle: (i, angle) => RadarChartTitle(text: i < keys.length ? keys[i] : ''),
+          tickCount: 3,
+          ticksTextStyle: const TextStyle(color: Colors.transparent, fontSize: 0),
+          tickBorderData: const BorderSide(color: Color(0xFF1E1E1E), width: 0.5),
+          gridBorderData: const BorderSide(color: Color(0xFF1E1E1E), width: 0.5),
+        ),
+      ),
+    );
+  }
+
+  // ─── Pro Page 4: 3박자 솔루션 ─────────────────────────────────────
+  Widget _buildPage4Pro() {
+    final r = analysisResult;
+    final threeFactor = r['three_factor'] as Map<String, dynamic>?;
+    final actionCards = (r['action_cards'] as List?) ?? [];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('3박자 솔루션', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          const Text('신체관리 · 얼굴관리 · 패션', style: TextStyle(fontSize: 11, color: Color(0xFF555555))),
+          const SizedBox(height: 16),
+
+          if (threeFactor != null) ...[
+            _threeFactorCard('💪 신체관리', threeFactor['physical']?.toString() ?? ''),
+            const SizedBox(height: 10),
+            _threeFactorCard('👤 얼굴관리', threeFactor['face']?.toString() ?? ''),
+            const SizedBox(height: 10),
+            _threeFactorCard('👔 패션', threeFactor['fashion']?.toString() ?? ''),
+          ] else ...[
+            ...actionCards.map((card) {
+              final c = card as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _threeFactorCard(c['category']?.toString() ?? '', c['principle']?.toString() ?? ''),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _threeFactorCard(String title, String content) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text(content, style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA), height: 1.6)),
+        ],
+      ),
+    );
+  }
+
+  // ─── Pro Page 5: 메이크업 4단계 ──────────────────────────────────
+  Widget _buildPage5Pro() {
+    final steps = List<Map<String, dynamic>>.from(
+        (analysisResult['makeup_steps'] as List?)?.map((e) => e as Map<String, dynamic>) ?? []);
+    final actionCards = (analysisResult['action_cards'] as List?) ?? [];
+    final makeupCard = actionCards.cast<Map<String, dynamic>>()
+        .firstWhere((c) => c['icon'] == 'makeup' || c['category']?.toString().contains('메이크업') == true,
+            orElse: () => <String, dynamic>{});
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('메이크업 가이드', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+
+          if (steps.isNotEmpty)
+            ...steps.asMap().entries.map((e) {
+              final step = e.value;
+              final products = List<Map<String, dynamic>>.from(
+                  (step['products'] as List?)?.map((p) => p as Map<String, dynamic>) ?? []);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111111),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        width: 24, height: 24,
+                        decoration: const BoxDecoration(color: Color(0xFFE8A030), shape: BoxShape.circle),
+                        child: Center(child: Text('${step['step_number'] ?? e.key + 1}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF1A0F00)))),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(step['step_name']?.toString() ?? '',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                    ]),
+                    if (step['description'] != null) ...[
+                      const SizedBox(height: 8),
+                      Text(step['description'].toString(),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA), height: 1.5)),
+                    ],
+                    if (products.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ...products.map((p) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text('• ${p['name'] ?? ''} — ${p['description'] ?? ''}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF777777))),
+                      )),
+                    ],
+                    if (step['tip'] != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1500),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('💡 ${step['tip']}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFFE8A030))),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            })
+          else if (makeupCard.isNotEmpty) ...[
+            _threeFactorCard(makeupCard['category']?.toString() ?? '메이크업', makeupCard['application']?.toString() ?? ''),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6, runSpacing: 4,
+              children: (makeupCard['references'] as List? ?? []).map((ref) {
+                final rm = ref as Map;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
+                  ),
+                  child: Text('${rm['name']} · ${rm['context']}',
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
+                );
+              }).toList(),
+            ),
+          ] else
+            const Center(child: Text('메이크업 데이터가 없어요', style: TextStyle(fontSize: 13, color: Color(0xFF444444)))),
+
+          const SizedBox(height: 16),
+          _buildAffiliateDisclaimer(),
+        ],
+      ),
+    );
+  }
+
+  // ─── Pro Page 6: 패션 룩 + PDF ────────────────────────────────────
+  Widget _buildPage6Pro() {
+    final looks = List<Map<String, dynamic>>.from(
+        (analysisResult['fashion_looks'] as List?)?.map((e) => e as Map<String, dynamic>) ?? []);
+    final palette = analysisResult['color_palette'] as Map<String, dynamic>?;
+    final hasFashionCard = (analysisResult['action_cards'] as List?)
+        ?.cast<Map<String, dynamic>>()
+        .any((c) => c['category']?.toString().contains('패션') == true) ?? false;
+    final fashionCard = hasFashionCard
+        ? (analysisResult['action_cards'] as List)
+            .cast<Map<String, dynamic>>()
+            .firstWhere((c) => c['category']?.toString().contains('패션') == true)
+        : <String, dynamic>{};
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 90,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('패션 룩', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+
+          if (looks.isNotEmpty)
+            ...looks.map((look) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(look['name']?.toString() ?? '',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                  if (look['rationale'] != null) ...[
+                    const SizedBox(height: 6),
+                    Text(look['rationale'].toString(),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+                  ],
+                  if ((look['items'] as List?)?.isNotEmpty == true) ...[
+                    const SizedBox(height: 8),
+                    ...(look['items'] as List).map((item) {
+                      final im = item as Map;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Text('• ${im['name'] ?? im.toString()}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF666666))),
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ))
+          else if (fashionCard.isNotEmpty)
+            _threeFactorCard(fashionCard['category']?.toString() ?? '패션', fashionCard['application']?.toString() ?? '')
+          else
+            const Center(child: Text('패션 데이터가 없어요', style: TextStyle(fontSize: 13, color: Color(0xFF444444)))),
+
+          if (palette != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('컬러 팔레트', style: TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 10),
+                  _paletteRow('메인', List<String>.from(palette['main'] ?? []), const Color(0xFF27AE60)),
+                  _paletteRow('포인트', List<String>.from(palette['accent'] ?? []), const Color(0xFFE8A030)),
+                  _paletteRow('피할 색', List<String>.from(palette['avoid'] ?? []), const Color(0xFFC0392B)),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.download, size: 18),
+            label: const Text('전체 분석 PDF 저장'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE8D5B7),
+              foregroundColor: Colors.black,
+              minimumSize: const Size(double.infinity, 52),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildAffiliateDisclaimer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _paletteRow(String label, List<String> colors, Color tagColor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(width: 44, child: Text(label, style: TextStyle(fontSize: 11, color: tagColor))),
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              children: colors.map((c) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: tagColor.withAlpha(20),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: tagColor.withAlpha(50), width: 0.5),
+                ),
+                child: Text(c, style: TextStyle(fontSize: 10, color: tagColor)),
+              )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAffiliateDisclaimer() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        '이 페이지의 제품 추천은 쿠팡 파트너스 활동의 일환으로,\n이에 따른 일정액의 수수료를 제공받습니다.',
+        style: TextStyle(color: Colors.white54, fontSize: 11),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
 
   Widget _buildPlaceholderPage(String title, IconData icon) {
     return Center(
