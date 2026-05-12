@@ -129,9 +129,14 @@ gap_percent는 0~100 사이 정수.`;
 const PRO_SCHEMA_INSTRUCTION = `
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
 
+CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
+- consultant_report_full: 5개 필드 모두 (quote 50자↑, observation/impact/gap/direction 각 20자↑)
+- makeup_steps: 반드시 4개 (step 1~4), 각 step에 products 최소 2개
+- fashion_looks: 반드시 2개, 각 룩에 items 5개 (Outer/Top/Bottom/Shoes/Acc)
+
 {
   "first_impression": {
-    "summary": "첫인상 한 줄 요약",
+    "summary": "첫인상 한 줄 요약 (카피 톤 적용, 20자 이상)",
     "face_shape": "얼굴형",
     "animal_type": "동물상",
     "strengths": ["강점1", "강점2", "강점3"]
@@ -147,13 +152,13 @@ const PRO_SCHEMA_INSTRUCTION = `
     "top_face_percent": 0,
     "middle_face_percent": 0,
     "bottom_face_percent": 0,
-    "details": ["얼굴 세부 특징 1", "얼굴 세부 특징 2", "얼굴 세부 특징 3"]
+    "details": ["세부 특징 1 (20자 이상)", "세부 특징 2 (20자 이상)", "세부 특징 3 (20자 이상)"]
   },
   "appearance_score": {
     "score": 0.0,
     "current_limit": 0.0,
     "optimized_limit": 0.0,
-    "tier_description": "현재 외관 티어 설명 1~2문장 (카피 톤 적용)"
+    "tier_description": "스타일링 완성도 설명 1~2문장 (30자 이상, 카피 톤 적용)"
   },
   "grooming_keywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5", "키워드6"],
   "radar": {
@@ -168,46 +173,100 @@ const PRO_SCHEMA_INSTRUCTION = `
     "gap_percent": 0
   },
   "consultant_report_full": {
-    "quote": "전문가 코멘트 (카피 톤 적용)",
-    "observation": "전체적 관찰 내용",
-    "impact": "현재 스타일이 인상에 미치는 영향",
-    "gap": "핵심 갭 요소",
-    "direction": "변화 방향성"
+    "quote": "전문가 인용 코멘트 (50자 이상 100자 이하, 카피 톤 적용, ~어요 종결)",
+    "observation": "현재 헤어/스타일에서 관찰되는 것 (30자 이상)",
+    "impact": "그게 인상에 미치는 영향 (30자 이상)",
+    "gap": "목표 스타일과의 핵심 차이 (20자 이상)",
+    "direction": "가장 효율적인 변화 방향 (20자 이상)"
   },
   "three_factor": {
-    "physical": {"summary": "피지컬 요약", "items": ["항목1", "항목2", "항목3"]},
-    "face": {"summary": "얼굴 요약", "items": ["항목1", "항목2", "항목3"]},
-    "fashion": {"summary": "패션 요약", "items": ["항목1", "항목2", "항목3"]}
+    "physical": {"summary": "피지컬 요약 (15자 이상)", "items": ["구체적 항목1", "구체적 항목2", "구체적 항목3"]},
+    "face": {"summary": "얼굴 요약 (15자 이상)", "items": ["구체적 항목1", "구체적 항목2", "구체적 항목3"]},
+    "fashion": {"summary": "패션 요약 (15자 이상)", "items": ["구체적 항목1", "구체적 항목2", "구체적 항목3"]}
   },
   "action_cards": [
-    {"category": "헤어스타일", "observation": "...", "application": "...", "references": [{"name": "...", "context": "...", "description": "..."}]},
-    {"category": "패션", "observation": "...", "application": "...", "references": []},
-    {"category": "메이크업", "observation": "...", "application": "...", "references": []}
+    {
+      "category": "헤어스타일",
+      "observation": "현재 헤어 상태 관찰 (30자 이상)",
+      "application": "구체적 적용 방법 (30자 이상)",
+      "references": [{"name": "셀럽 이름", "context": "시기/작품", "description": "어떤 스타일"}]
+    },
+    {"category": "패션", "observation": "30자 이상", "application": "30자 이상", "references": [{"name": "...", "context": "...", "description": "..."}]},
+    {"category": "메이크업", "observation": "30자 이상", "application": "30자 이상", "references": [{"name": "...", "context": "...", "description": "..."}]}
   ],
   "makeup_steps": [
     {
       "step_number": 1,
       "step_name": "기초",
-      "description": "기초 단계 설명 (카피 톤 적용)",
-      "products": [{"name": "제품명", "shade": null, "platform": "coupang", "affiliate_url": ""}],
-      "tip": "이 단계의 핵심 팁"
+      "description": "기초 단계 설명 (카피 톤, 20자 이상)",
+      "products": [
+        {"name": "한율 부들밤 모공수축패드", "shade": null, "category": "토너패드", "usage": "AHA 성분으로 각질 정리, 세안 후 바로 사용", "platform": "coupang", "search_query": "한율 부들밤 모공수축패드"},
+        {"name": "라운드랩 1025 독도 토너", "shade": null, "category": "토너", "usage": "수분 흡수 후 가볍게 두드려 흡수", "platform": "coupang", "search_query": "라운드랩 1025 독도 토너"},
+        {"name": "넘버즈인 세럼", "shade": null, "category": "세럼", "usage": "피부결 따라 세로로 흡수", "platform": "coupang", "search_query": "넘버즈인 세럼"},
+        {"name": "구셀 메이크업 베이스", "shade": null, "category": "베이스", "usage": "얇게 전체 도포 후 30초 흡수", "platform": "coupang", "search_query": "구셀 메이크업 베이스"}
+      ],
+      "tip": "묽은 제형부터 무거운 제형 순서로, 피부결 따라 세로로 흡수시켜줘요"
     },
-    {"step_number": 2, "step_name": "베이스", "description": "...", "products": [], "tip": "..."},
-    {"step_number": 3, "step_name": "음영", "description": "...", "products": [], "tip": "..."},
-    {"step_number": 4, "step_name": "마무리", "description": "...", "products": [], "tip": "..."}
+    {
+      "step_number": 2,
+      "step_name": "베이스",
+      "description": "피부 톤 균일화 단계 (카피 톤, 20자 이상)",
+      "products": [
+        {"name": "비레디 블루 파운데이션 03호", "shade": "03호", "category": "파운데이션", "usage": "소량을 전체적으로 가볍게 펴바르기", "platform": "coupang", "search_query": "비레디 블루 파운데이션"},
+        {"name": "루나 롱래스팅 팁 컨실러 픽싱핏 04호", "shade": "04호 샌드", "category": "컨실러", "usage": "잡티와 다크서클 위에 두드려 커버", "platform": "coupang", "search_query": "루나 롱래스팅 컨실러 픽싱핏"},
+        {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "파우더", "usage": "T존 중심으로 살짝 눌러 마무리", "platform": "coupang", "search_query": "스킨푸드 피치뽀송 멀티 피니시 파우더"}
+      ],
+      "tip": "포인트는 소량이에요. 티 안 나게 자연스럽게 얹어주는 게 핵심이거든요"
+    },
+    {
+      "step_number": 3,
+      "step_name": "음영",
+      "description": "눈썹-쉐딩-립 순서로 인상 정돈 (카피 톤, 20자 이상)",
+      "products": [
+        {"name": "클리오 킬브로우 오토하드펜슬 05호 그레이브라운", "shade": "05호", "category": "눈썹", "usage": "눈썹 결 따라 그린 후 스크류로 빗어주기", "platform": "coupang", "search_query": "클리오 킬브로우 오토하드펜슬"},
+        {"name": "투쿨포스쿨 뉴트럴 쉐딩", "shade": null, "category": "쉐딩", "usage": "얼굴 윤곽 바깥쪽에만 살짝 블렌딩", "platform": "coupang", "search_query": "투쿨포스쿨 뉴트럴 쉐딩"},
+        {"name": "롬앤 쥬시 래스팅 틴트 06피그피그", "shade": "06 피그피그", "category": "립", "usage": "입술 안쪽부터 자연스럽게 펴 바르기", "platform": "coupang", "search_query": "롬앤 쥬시 래스팅 틴트 06"}
+      ],
+      "tip": "쉐딩은 얼굴 윤곽 바깥쪽에만 살짝. 과하면 어색해 보여요"
+    },
+    {
+      "step_number": 4,
+      "step_name": "마무리",
+      "description": "지속력 확보 마무리 단계 (카피 톤, 20자 이상)",
+      "products": [
+        {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "세팅파우더", "usage": "전체적으로 가볍게 눌러 세팅", "platform": "coupang", "search_query": "스킨푸드 피치뽀송 멀티 피니시 파우더"},
+        {"name": "어반디케이 메이크업 픽서", "shade": null, "category": "픽서", "usage": "20cm 거리에서 가볍게 두 번 분사", "platform": "coupang", "search_query": "어반디케이 메이크업 픽서"}
+      ],
+      "tip": "픽서는 20cm 거리에서 가볍게 두 번. 효율적인 마무리 방법이에요"
+    }
   ],
   "fashion_looks": [
     {
-      "name": "룩 이름",
+      "name": "데일리 캐주얼",
       "items": [
-        {"category": "Top", "description": "아이템 설명", "affiliate": {"name": "제품명", "platform": "coupang", "url": ""}},
-        {"category": "Bottom", "description": "...", "affiliate": {"name": "...", "platform": "coupang", "url": ""}},
-        {"category": "Shoes", "description": "...", "affiliate": {"name": "...", "platform": "coupang", "url": ""}},
-        {"category": "Acc", "description": "...", "affiliate": {"name": "...", "platform": "coupang", "url": ""}}
+        {"category": "Outer", "description": "화이트 린넨 셔츠 (오버사이즈)", "rationale": "청량감 + 레이어드 가능", "search_query": "화이트 린넨 셔츠 오버사이즈", "platform": "coupang"},
+        {"category": "Top", "description": "화이트 반팔 코튼 이너", "rationale": "정돈된 레이어드", "search_query": "화이트 반팔 코튼 티셔츠", "platform": "coupang"},
+        {"category": "Bottom", "description": "와이드 연청 데님 팬츠", "rationale": "와이드 핏으로 하체 라인 정돈", "search_query": "와이드 연청 데님 팬츠", "platform": "coupang"},
+        {"category": "Shoes", "description": "화이트 로우 스니커즈", "rationale": "색감 통일, 캐주얼 강조", "search_query": "화이트 로우 스니커즈", "platform": "coupang"},
+        {"category": "Acc", "description": "검정 가죽 벨트 (슬림)", "rationale": "포인트 + 허리 라인", "search_query": "검정 가죽 벨트 슬림", "platform": "coupang"}
       ],
-      "rationale": "이 룩을 추천하는 이유 (카피 톤 적용)"
+      "rationale": "셔츠는 빼서 입고, 이너는 넣어서 입어요. 화이트+연청 조합으로 청량감 있어요",
+      "styling_tip": "셔츠는 빼서, 이너는 넣어서",
+      "color_palette": ["#FFFFFF", "#A8C5DA", "#000000"]
     },
-    {"name": "룩2 이름", "items": [], "rationale": "..."}
+    {
+      "name": "세미 포멀",
+      "items": [
+        {"category": "Outer", "description": "검정 반팔 셔츠 (슬림핏 X, 레귤러 핏)", "rationale": "깔끔하고 정돈된 인상", "search_query": "검정 반팔 셔츠 레귤러핏", "platform": "coupang"},
+        {"category": "Top", "description": "검정 이너 (넣어 입기용)", "rationale": "셔츠 넣입 깔끔하게", "search_query": "검정 이너 넣어입기", "platform": "coupang"},
+        {"category": "Bottom", "description": "회색 세미와이드 슬랙스", "rationale": "정돈된 라인, 격식 있는 분위기", "search_query": "회색 세미와이드 슬랙스", "platform": "coupang"},
+        {"category": "Shoes", "description": "앵클부츠 (키높이 깔창 활용)", "rationale": "키 보정 + 포멀한 인상", "search_query": "앵클부츠 남성", "platform": "coupang"},
+        {"category": "Acc", "description": "검정 가죽 벨트", "rationale": "상하의 통일감", "search_query": "검정 가죽 벨트", "platform": "coupang"}
+      ],
+      "rationale": "검정 셔츠 넣어 입기로 깔끔하게. 회색 와이드로 하체 비율 보완이 효율적이에요",
+      "styling_tip": "검정 셔츠는 꼭 넣어서, 슬랙스는 허리에 맞게",
+      "color_palette": ["#000000", "#808080", "#1A1A1A"]
+    }
   ],
   "color_palette": {
     "main": ["#000000", "#1A2238", "#FFFFFF"],
@@ -218,7 +277,52 @@ const PRO_SCHEMA_INSTRUCTION = `
 
 모든 숫자 필드는 실제 숫자로. 문자열 필드는 카피 톤 규칙 적용.
 radar 값은 0.0~1.0 범위. scores 각 항목은 0.0~10.0 범위.
-appearance_score.score는 스타일링 완성도 지표로 6.0~8.0 범위.`;
+appearance_score.score는 스타일링 완성도 지표로 6.0~8.0 범위.
+makeup_steps는 반드시 4개, fashion_looks는 반드시 2개여야 합니다.`;
+
+// ─── 응답 검증 ────────────────────────────────────────────────
+function validateProResponse(result) {
+  try {
+    // 컨설턴트 리포트 4요소
+    const report = result.consultant_report_full;
+    if (!report) return false;
+    if ((report.quote || '').length < 50) return false;
+    if ((report.observation || '').length < 20) return false;
+    if ((report.impact || '').length < 20) return false;
+    if ((report.gap || '').length < 20) return false;
+    if ((report.direction || '').length < 20) return false;
+
+    // 메이크업 4단계
+    const steps = result.makeup_steps;
+    if (!steps || steps.length < 4) return false;
+    for (const step of steps) {
+      if (!step.products || step.products.length < 2) return false;
+    }
+
+    // 패션 룩 2개
+    const looks = result.fashion_looks;
+    if (!looks || looks.length < 2) return false;
+    for (const look of looks) {
+      if (!look.items || look.items.length < 4) return false;
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function validateFreeResponse(result) {
+  try {
+    if (!result.first_impression?.summary) return false;
+    if (!result.action_cards || result.action_cards.length < 3) return false;
+    const report = result.consultant_report_simple;
+    if (!report?.quote || report.quote.length < 20) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 // ─── 메인 함수 ────────────────────────────────────────────────
 exports.analyzeImage = onRequest(
@@ -261,25 +365,27 @@ exports.analyzeImage = onRequest(
           return res.status(200).json({ ...result, skinAnalysis: result.scores || {} });
         }
 
-        // 금지 단어 검출 + 재시도 (최대 2회)
-        if (containsBanned(JSON.stringify(result))) {
-          console.log("금지 단어 검출 — 1차 재시도");
-          const retryPrompt = userPrompt + "\n\n[중요] 이전 응답에 금지 표현이 포함되어 있었습니다. 시술/성형/의료/신체비하 표현 없이 다시 작성하세요.";
-          result = await callGPT(openai, retryPrompt, imgData, mimeType);
+        // 검증 (금지 단어 + 필수 필드)
+        const validator = isPro ? validateProResponse : validateFreeResponse;
+        const resultText = JSON.stringify(result);
+        const hasBanned = containsBanned(resultText);
+        const isValid = validator(result);
 
-          if (containsBanned(JSON.stringify(result))) {
-            console.log("금지 단어 검출 — 2차 재시도 (강화)");
-            result = await callGPT(
-              openai,
-              retryPrompt + "\n시술/성형 관련 단어가 단 하나도 없어야 합니다.",
-              imgData,
-              mimeType
-            );
+        if (hasBanned || !isValid) {
+          console.log(`1차 재시도 — 금지어: ${hasBanned}, 검증실패: ${!isValid}`);
+          const retryPrompt = userPrompt +
+            (hasBanned ? "\n\n[중요] 시술/성형/의료/신체비하 표현 없이 다시 작성하세요." : "") +
+            (!isValid && isPro ? "\n\n[중요] makeup_steps 4개, fashion_looks 2개, consultant_report_full 5개 필드 모두 채워주세요." : "");
 
-            if (containsBanned(JSON.stringify(result))) {
-              console.log("금지 단어 — 폴백 응답 사용");
-              result = getFallbackResponse(isPro);
-            }
+          try {
+            result = await callGPT(openai, retryPrompt, imgData, mimeType);
+          } catch (e) {
+            result = getFallbackResponse(isPro);
+          }
+
+          if (containsBanned(JSON.stringify(result)) || !validator(result)) {
+            console.log("2차 재시도 실패 — 폴백 사용");
+            result = getFallbackResponse(isPro);
           }
         }
 
