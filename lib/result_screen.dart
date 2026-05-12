@@ -10,6 +10,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'subscription_service.dart';
 import 'paywall_screen.dart';
+import 'services/pdf_service.dart';
 import 'widgets/animal_compare_card.dart';
 import 'widgets/gap_progress_bar.dart';
 import 'widgets/gap_radar_chart.dart';
@@ -603,7 +604,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () => PdfService.generateAndOpen(analysisResult),
             icon: const Icon(Icons.download, size: 18),
             label: const Text('전체 분석 PDF 저장'),
             style: ElevatedButton.styleFrom(
