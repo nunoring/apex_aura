@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'home_screen.dart';
 
@@ -50,7 +51,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
-  void _goHome() {
+  Future<void> _goHome() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_onboarding', true);
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const HomeScreen()),

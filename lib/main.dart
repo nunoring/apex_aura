@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_screen.dart';
+import 'home_screen.dart';
 import 'subscription_service.dart';
 
 void main() async {
@@ -8,6 +10,11 @@ void main() async {
   await SubscriptionService.init();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const MyApp());
+}
+
+Future<bool> _hasSeenOnboarding() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('has_seen_onboarding') ?? false;
 }
 
 class MyApp extends StatelessWidget {
@@ -21,7 +28,17 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFF0D0D0D),
       ),
-      home: const OnboardingScreen(),
+      home: FutureBuilder<bool>(
+        future: _hasSeenOnboarding(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return snapshot.data! ? const HomeScreen() : const OnboardingScreen();
+        },
+      ),
     );
   }
 }
