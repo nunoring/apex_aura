@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'subscription_service.dart';
 import 'paywall_screen.dart';
 import 'services/pdf_service.dart';
+import 'services/share_service.dart';
 import 'widgets/animal_compare_card.dart';
 import 'widgets/gap_progress_bar.dart';
 import 'widgets/gap_radar_chart.dart';
@@ -60,6 +61,7 @@ class _ResultScreenState extends State<ResultScreen> {
   bool _isSubscribed = false;
   bool _isPro = false;
   List<Widget> _pages = [];
+  final GlobalKey _shareKey = GlobalKey();
 
   @override
   void initState() {
@@ -854,7 +856,9 @@ class _ResultScreenState extends State<ResultScreen> {
         left: 20, right: 20, top: 16,
         bottom: MediaQuery.of(context).padding.bottom + 90,
       ),
-      child: Column(
+      child: RepaintBoundary(
+        key: _shareKey,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('변신 플랜', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
@@ -957,7 +961,7 @@ class _ResultScreenState extends State<ResultScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: _shareResult,
+                  onTap: () => ShareService.shareCard(_shareKey),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
@@ -1000,7 +1004,8 @@ class _ResultScreenState extends State<ResultScreen> {
             ],
           ),
         ],
-      ),
+      ),    // Column
+    ),      // RepaintBoundary
     );
   }
 
