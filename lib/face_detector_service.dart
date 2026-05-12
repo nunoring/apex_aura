@@ -26,7 +26,9 @@ class FaceDetectorService {
       // 대표 사진(첫 번째)은 선택된 faceIndex 사용, 나머지는 face[0]
       final faceIdx = i == 0 ? primaryFaceIndex : 0;
       final r = await analyzeFace(imageFiles[i], faceIndex: faceIdx);
-      if (r != null) results.add(r);
+      if (r == null) continue;
+      if (r.containsKey('error')) return r; // 각도 에러 즉시 전파
+      results.add(r);
     }
     if (results.isEmpty) return null;
     if (results.length == 1) return results[0];
@@ -127,6 +129,19 @@ class FaceDetectorService {
       if (faces.isEmpty || faceIndex >= faces.length) return null;
 
       final face = faces[faceIndex];
+
+      // 얼굴 각도 체크 — 15도 초과 시 차단
+      final double? angleY = face.headEulerAngleY;
+      final double? angleX = face.headEulerAngleX;
+      if (angleY == null || angleX == null ||
+          angleY.abs() > 15 || angleX.abs() > 15) {
+        return {
+          'error': 'angle_detected',
+          'message': '정면 얼굴 사진을 사용해주세요\n(카메라를 똑바로 바라보는 사진)',
+          'angle_y': angleY ?? 0.0,
+          'angle_x': angleX ?? 0.0,
+        };
+      }
 
       // 랜드마크 추출
       final leftEye = face.landmarks[FaceLandmarkType.leftEye];

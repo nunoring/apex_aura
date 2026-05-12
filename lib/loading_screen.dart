@@ -166,6 +166,27 @@ class _LoadingScreenState extends State<LoadingScreen>
         return;
       }
 
+      // 측면 얼굴 차단
+      if (faceData['error'] == 'angle_detected') {
+        if (mounted) {
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('📸 사진을 다시 선택해주세요'),
+              content: Text(faceData!['message'] ?? '정면 얼굴 사진을 사용해주세요'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('다시 선택'),
+                ),
+              ],
+            ),
+          );
+          if (mounted) Navigator.pop(context);
+        }
+        return;
+      }
+
       // Step 2: 황금비율 수치 계산 완료 (ML Kit 끝)
       if (mounted) setState(() => _currentStep = 2);
       await Future.delayed(const Duration(milliseconds: 300));
