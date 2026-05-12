@@ -10,6 +10,23 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'subscription_service.dart';
 import 'paywall_screen.dart';
+import 'widgets/animal_compare_card.dart';
+import 'widgets/gap_progress_bar.dart';
+import 'widgets/gap_radar_chart.dart';
+import 'widgets/consultant_report.dart';
+import 'widgets/action_card.dart';
+import 'widgets/appearance_score_widget.dart';
+import 'widgets/grooming_keyword_chip.dart';
+import 'widgets/three_factor_hub.dart';
+import 'widgets/makeup_step_card.dart';
+import 'widgets/affiliate_chip.dart';
+import 'widgets/fashion_look_card.dart';
+import 'widgets/color_palette_guide.dart';
+import 'widgets/result_cta.dart';
+import 'widgets/free_lock_teaser.dart';
+import 'widgets/free_limit_disclaimer.dart';
+import 'widgets/price_comparison_widget.dart';
+import 'widgets/pro_paywall_sheet.dart';
 
 class ResultScreen extends StatefulWidget {
   final String animalType;
