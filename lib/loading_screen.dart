@@ -395,6 +395,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         'impression': impression,
         'faceData': faceData,
         'gender': widget.gender,
+        'isPro': false,
         if (extraInstruction != null) 'extraInstruction': extraInstruction,
       }),
     );
@@ -403,7 +404,9 @@ class _LoadingScreenState extends State<LoadingScreen>
       throw Exception('서버 오류: ${response.statusCode}');
     }
 
-    return jsonDecode(response.body);
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    // 새 API는 { success, data } 구조, 구버전은 flat 구조
+    return decoded.containsKey('data') ? decoded['data'] as Map<String, dynamic> : decoded;
   }
 
   @override
