@@ -65,7 +65,8 @@
       "Bash(Select-String -Pattern \"error:|Error\")",
       "Bash(Get-Content \"C:\\\\Users\\\\vacma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-vacma-Desktop-apps-apex-aura\\\\78229015-e224-4a60-b7f5-3b6f73701fa4\\\\tasks\\\\blzuw8c12.output\")",
       "Bash(Select-String \"error:|Built \")",
-      "Bash(Select-Object -Last 5)"
+      "Bash(Select-Object -Last 5)",
+      "Bash(node -e ' *)"
     ]
   }
 }

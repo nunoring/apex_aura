@@ -581,17 +581,6 @@ exports.analyzeImage = onRequest(
         }
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-        // 미성년자 차단 — 14세 미만 GPT 이중 안전망
-        const ageResult = await checkAge(openai, imgData, mimeType);
-        console.log("연령 체크 결과:", ageResult);
-        if (ageResult !== "ok") {
-          return res.status(403).json({
-            error: "age_restriction",
-            message: "본 앱은 만 14세 이상만 이용 가능합니다. 본인 사진을 다시 확인해주세요.",
-          });
-        }
-
         const schemaInstruction = isPro ? PRO_SCHEMA_INSTRUCTION : FREE_SCHEMA_INSTRUCTION;
         const userPrompt = buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction);
 
@@ -629,28 +618,9 @@ exports.analyzeImage = onRequest(
           }
         }
 
-        // AI 티 검출 — 문제 있으면 1회 재시도
+        // AI 티 로깅 (재시도 없음 — 속도 최적화)
         const aiToneIssues = detectAITone(result);
-        if (aiToneIssues.length > 0) {
-          console.log('AI 티 검출:', aiToneIssues.slice(0, 3));
-          const feedbackPrompt = userPrompt + `
-
-[품질 피드백] 이전 응답에서 다음 문제가 발생했습니다:
-${aiToneIssues.slice(0, 5).map((issue, i) => `${i + 1}. ${issue}`).join('\n')}
-
-수정 지침:
-- 모든 진단은 "현재 사진에서 보이는 ___"로 시작
-- application 각 100자 이상, 강조 어휘(핵심은/사실/근데/여기서 바뀌는) 최소 1개
-- 셀럽 references의 context는 작품명+시기+장면 모두 포함`;
-          try {
-            const refined = await callGPT(openai, feedbackPrompt, imgData, mimeType);
-            if (validator(refined) && !containsBanned(JSON.stringify(refined))) {
-              result = refined;
-            }
-          } catch (e) {
-            console.log('AI 티 재시도 실패 — 기존 결과 사용');
-          }
-        }
+        if (aiToneIssues.length > 0) console.log('AI 티 감지 (로그만):', aiToneIssues.slice(0, 3));
 
         // 기존 클라이언트 호환 (skinAnalysis 없이도 동작하도록)
         return res.status(200).json({ ...result, skinAnalysis: result.scores || {} });
@@ -715,7 +685,7 @@ ${schemaInstruction}`;
 async function callGPT(openai, userPrompt, imageBase64, mimeType) {
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
-    max_tokens: 4500,
+    max_tokens: 2500,
     temperature: 0.5,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
