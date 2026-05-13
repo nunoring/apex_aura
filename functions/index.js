@@ -18,6 +18,18 @@ function containsBanned(text) {
   });
 }
 
+// ─── 동물상 카탈로그 ─────────────────────────────────────────
+const ANIMAL_CATALOG = [
+  { name: "강아지상", emoji: "🐶", keywords: ["부드러움", "친근함", "자연스러움"] },
+  { name: "고양이상", emoji: "🐱", keywords: ["도도함", "신비로움", "우아함"] },
+  { name: "여우상",   emoji: "🦊", keywords: ["세련됨", "날카로움", "정돈됨"] },
+  { name: "사슴상",   emoji: "🦌", keywords: ["청초함", "순수함", "차분함"] },
+  { name: "늑대상",   emoji: "🐺", keywords: ["강인함", "카리스마", "차가움"] },
+  { name: "토끼상",   emoji: "🐰", keywords: ["귀여움", "발랄함", "동안"] },
+  { name: "곰상",     emoji: "🐻", keywords: ["듬직함", "편안함", "포근함"] },
+];
+const CATALOG_NAMES = ANIMAL_CATALOG.map(a => a.name).join(", ");
+
 // ─── GPT 시스템 프롬프트 ─────────────────────────────────────
 const SYSTEM_PROMPT = `당신은 전문 패션 & 스타일 컨설턴트입니다.
 사진 속 인물의 현재 헤어스타일, 패션, 그루밍 상태를 보고 스타일링 개선 솔루션을 제공합니다.
@@ -60,6 +72,22 @@ const SYSTEM_PROMPT = `당신은 전문 패션 & 스타일 컨설턴트입니다
 "시선을 끄는 외관" → 긍정적 방향으로 재해석
 "첫인상에서 매력적으로 보이는" 방향으로 서술
 
+## 동물상 카탈로그 (반드시 이 7종에서만 선택)
+강아지상 🐶 — 부드러움, 친근함, 자연스러움
+고양이상 🐱 — 도도함, 신비로움, 우아함
+여우상 🦊 — 세련됨, 날카로움, 정돈됨
+사슴상 🦌 — 청초함, 순수함, 차분함
+늑대상 🐺 — 강인함, 카리스마, 차가움
+토끼상 🐰 — 귀여움, 발랄함, 동안
+곰상 🐻 — 듬직함, 편안함, 포근함
+
+## 동물상 분류 규칙
+- main_animal: 사진에서 가장 강하게 느껴지는 1종
+- sub_animal: 두 번째로 느껴지는 1종
+- target_animal: 스타일링으로 도달 가능한 목표 1종
+- 셋은 반드시 서로 다른 동물상이어야 함
+- keywords는 해당 카탈로그의 것만 사용 (창작 금지)
+
 ## 절대 금지
 - 시술/성형/의료 언급 (필러, 보톡스, 수술, 레이저, 주사 등 일체)
 - 신체 비하 표현 (못생긴, 결함, 흠, 단점 등)
@@ -71,10 +99,31 @@ const FREE_SCHEMA_INSTRUCTION = `
 
 {
   "first_impression": {
-    "summary": "첫인상 한 줄 요약 (카피 톤 적용)",
-    "face_shape": "얼굴형 (예: 둥근형~하트형)",
-    "animal_type": "동물상 (예: 강아지상)",
-    "strengths": ["강점1", "강점2", "강점3"]
+    "summary": "첫인상 한 줄 요약 (카피 톤 적용, 20자 이상)",
+    "face_shape": "얼굴형 (예: 계란형)",
+    "main_animal": {
+      "name": "강아지상",
+      "emoji": "🐶",
+      "keywords": ["부드러움", "친근함", "자연스러움"],
+      "strengths": [
+        {"title": "강점 제목1", "description": "30자 이상 구체적 설명 (~어요 종결)"},
+        {"title": "강점 제목2", "description": "30자 이상 구체적 설명"},
+        {"title": "강점 제목3", "description": "30자 이상 구체적 설명"}
+      ],
+      "tip": "이 매력을 살리는 방향 팁 (30자 이상, 카피 톤)"
+    },
+    "sub_animal": {
+      "name": "고양이상",
+      "emoji": "🐱",
+      "keywords": ["도도함", "신비로움"],
+      "comment": "보조 매력 설명 (30자 이상, 카피 톤)"
+    },
+    "target_animal": {
+      "name": "여우상",
+      "emoji": "🦊",
+      "keywords": ["세련됨", "정돈됨"],
+      "comment": "목표 동물상 설명 (20자 이상, 카피 톤)"
+    }
   },
   "scores": {
     "symmetry": 0.0,
@@ -130,6 +179,11 @@ const PRO_SCHEMA_INSTRUCTION = `
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
 
 CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
+- first_impression.main_animal.strengths: 정확히 3개, 각 description 30자↑
+- first_impression.main_animal.tip: 30자↑
+- first_impression.sub_animal.comment: 30자↑
+- first_impression.target_animal.comment: 20자↑
+- main/sub/target은 모두 서로 다른 동물상 (카탈로그에서만 선택)
 - consultant_report_full: 5개 필드 모두 (quote 50자↑, observation/impact/gap/direction 각 20자↑)
 - makeup_steps: 반드시 4개 (step 1~4), 각 step에 products 최소 2개
 - fashion_looks: 반드시 2개, 각 룩에 items 5개 (Outer/Top/Bottom/Shoes/Acc)
@@ -137,9 +191,30 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
 {
   "first_impression": {
     "summary": "첫인상 한 줄 요약 (카피 톤 적용, 20자 이상)",
-    "face_shape": "얼굴형",
-    "animal_type": "동물상",
-    "strengths": ["강점1", "강점2", "강점3"]
+    "face_shape": "계란형",
+    "main_animal": {
+      "name": "강아지상",
+      "emoji": "🐶",
+      "keywords": ["부드러움", "친근함", "자연스러움"],
+      "strengths": [
+        {"title": "부드러운 인상", "description": "처음 본 사람도 편안하게 느끼는 매력이 있어요 (30자 이상)"},
+        {"title": "친근한 분위기", "description": "쉽게 다가갈 수 있는 따뜻한 매력을 가지고 있어요 (30자 이상)"},
+        {"title": "자연스러운 표정", "description": "꾸미지 않아도 매력적인 표정을 가지고 있어요 (30자 이상)"}
+      ],
+      "tip": "이 매력은 그대로 살리고 다른 요소를 더하는 방향이 효율적이에요 (30자 이상)"
+    },
+    "sub_animal": {
+      "name": "고양이상",
+      "emoji": "🐱",
+      "keywords": ["도도함", "신비로움"],
+      "comment": "이 매력도 함께 가지고 있어요. 활용하면 입체적 인상이 나와요 (30자 이상)"
+    },
+    "target_animal": {
+      "name": "여우상",
+      "emoji": "🦊",
+      "keywords": ["세련됨", "정돈됨"],
+      "comment": "스타일링으로 도달 가능한 목표예요 (20자 이상)"
+    }
   },
   "scores": {
     "symmetry": 0.0,
@@ -281,7 +356,31 @@ appearance_score.score는 스타일링 완성도 지표로 6.0~8.0 범위.
 makeup_steps는 반드시 4개, fashion_looks는 반드시 2개여야 합니다.`;
 
 // ─── 응답 검증 ────────────────────────────────────────────────
+function validateAnimalRanking(result) {
+  try {
+    const fi = result.first_impression;
+    if (!fi) return false;
+    const main = fi.main_animal;
+    const sub = fi.sub_animal;
+    const target = fi.target_animal;
+    if (!main || !sub || !target) return false;
+    if (!main.name || !main.emoji) return false;
+    if (!main.keywords || main.keywords.length < 2) return false;
+    if (!main.strengths || main.strengths.length !== 3) return false;
+    for (const s of main.strengths) {
+      if (!s.title || !s.description || s.description.length < 15) return false;
+    }
+    if (!main.tip || main.tip.length < 15) return false;
+    if (!sub.name || !sub.emoji || !sub.comment || sub.comment.length < 15) return false;
+    if (!target.name || !target.emoji || !target.comment || target.comment.length < 10) return false;
+    const animals = new Set([main.name, sub.name, target.name]);
+    if (animals.size !== 3) return false;
+    return true;
+  } catch (e) { return false; }
+}
+
 function validateProResponse(result) {
+  if (!validateAnimalRanking(result)) return false;
   try {
     // 컨설턴트 리포트 4요소
     const report = result.consultant_report_full;
@@ -313,6 +412,7 @@ function validateProResponse(result) {
 }
 
 function validateFreeResponse(result) {
+  if (!validateAnimalRanking(result)) return false;
   try {
     if (!result.first_impression?.summary) return false;
     if (!result.action_cards || result.action_cards.length < 3) return false;
@@ -469,8 +569,26 @@ function getFallbackResponse(isPro) {
     first_impression: {
       summary: "전반적으로 균형 잡힌 인상이에요.",
       face_shape: "계란형",
-      animal_type: "강아지상",
-      strengths: ["부드러운 인상", "균형 잡힌 이목구비", "자연스러운 매력"],
+      main_animal: {
+        name: "강아지상", emoji: "🐶",
+        keywords: ["부드러움", "친근함", "자연스러움"],
+        strengths: [
+          { title: "부드러운 인상", description: "처음 본 사람도 편안하게 느끼는 매력이 있어요." },
+          { title: "친근한 분위기", description: "쉽게 다가갈 수 있는 따뜻한 매력을 가지고 있어요." },
+          { title: "자연스러운 표정", description: "꾸미지 않아도 매력적인 표정을 가지고 있어요." },
+        ],
+        tip: "이 매력은 그대로 살리고 헤어와 스타일링을 더하는 방향이 효율적이에요.",
+      },
+      sub_animal: {
+        name: "고양이상", emoji: "🐱",
+        keywords: ["도도함", "신비로움"],
+        comment: "이 매력도 함께 가지고 있어요. 활용하면 입체적 인상이 나와요.",
+      },
+      target_animal: {
+        name: "여우상", emoji: "🦊",
+        keywords: ["세련됨", "정돈됨"],
+        comment: "스타일링으로 충분히 도달 가능한 목표예요.",
+      },
     },
     scores: { symmetry: 7.0, skin: 6.5, features: 6.8, overall_impression: 6.8 },
     comparison: {

@@ -29,6 +29,9 @@ import 'widgets/free_lock_teaser.dart';
 import 'widgets/free_limit_disclaimer.dart';
 import 'widgets/price_comparison_widget.dart';
 import 'widgets/pro_paywall_sheet.dart';
+import 'widgets/main_animal_flip_card.dart';
+import 'widgets/sub_animal_card.dart';
+import 'widgets/target_animal_card.dart';
 
 class ResultScreen extends StatefulWidget {
   final String animalType;
@@ -98,18 +101,95 @@ class _ResultScreenState extends State<ResultScreen> {
     _buildPage6Pro(),
   ];
 
-  // ─── Pro Page 1: 첫인상 강화 ──────────────────────────────────────
+  // ─── Pro Page 1: 첫인상 + 외모 점수 ─────────────────────────────
   Widget _buildPage1Pro() {
-    final faceAnalysis = analysisResult['face_analysis'] as Map<String, dynamic>?;
-    return Stack(
-      children: [
-        _buildPage1(),
-        if (faceAnalysis != null)
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: _buildFaceRatioCard(faceAnalysis),
+    final s = _abilityScores;
+    final appearanceScore = analysisResult['appearance_score'] as Map<String, dynamic>?;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // 기존 Page1 콘텐츠 (사진 + 동물상 배지 + 갭 분석)
+          // _buildPage1()은 SingleChildScrollView라 직접 내용을 재사용
+          _buildPage1(),
+          // 외모 점수 섹션
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(color: Color(0xFF1E1E1E)),
+                const SizedBox(height: 12),
+                const Text('스타일 완성도',
+                    style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                // 총점
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(children: [
+                        Text('${appearanceScore?['score'] ?? s.total}',
+                            style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, color: s.tierColor)),
+                        const Text(' / 100', style: TextStyle(fontSize: 16, color: Color(0xFF444444))),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: s.tierColor.withAlpha(30),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(s.tier, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: s.tierColor)),
+                        ),
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(
+                        appearanceScore?['tier_description']?.toString() ?? s.tagline,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 항목별 바
+                ...s.stats.map((stat) {
+                  final label = stat.$1;
+                  final score = stat.$2;
+                  final color = score >= 70 ? const Color(0xFF27AE60) : score >= 50 ? const Color(0xFFE8A030) : const Color(0xFFC0392B);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFAAAAAA))),
+                          const Spacer(),
+                          Text('$score', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+                        ]),
+                        const SizedBox(height: 3),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: score / 100,
+                            backgroundColor: const Color(0xFF222222),
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                            minHeight: 5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -150,8 +230,67 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  // ─── Pro Page 2: 외모 점수 ────────────────────────────────────────
+  // ─── Pro Page 2: 동물상 매칭 ─────────────────────────────────────
   Widget _buildPage2Pro() {
+    final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
+    final mainA = fi?['main_animal'] as Map<String, dynamic>?;
+    final subA = fi?['sub_animal'] as Map<String, dynamic>?;
+    final targetA = fi?['target_animal'] as Map<String, dynamic>?;
+
+    if (mainA == null) {
+      return const Center(
+        child: Text('동물상 데이터를 불러오는 중이에요',
+            style: TextStyle(color: Color(0xFF555555))));
+    }
+
+    final strengths = (mainA['strengths'] as List? ?? [])
+        .map((s) => Strength.fromJson(s as Map<String, dynamic>))
+        .toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('당신의 동물상',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 4),
+          const Text('두 가지 동물상의 매력을 함께 가지고 있어요',
+              style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
+          const SizedBox(height: 20),
+
+          MainAnimalFlipCard(
+            name: mainA['name']?.toString() ?? '',
+            emoji: mainA['emoji']?.toString() ?? '',
+            keywords: List<String>.from(mainA['keywords'] ?? []),
+            strengths: strengths,
+            tip: mainA['tip']?.toString() ?? '',
+          ),
+          const SizedBox(height: 12),
+
+          if (subA != null)
+            SubAnimalCard(
+              name: subA['name']?.toString() ?? '',
+              emoji: subA['emoji']?.toString() ?? '',
+              keywords: List<String>.from(subA['keywords'] ?? []),
+              comment: subA['comment']?.toString() ?? '',
+            ),
+          const SizedBox(height: 10),
+
+          if (targetA != null)
+            TargetAnimalCard(
+              name: targetA['name']?.toString() ?? '',
+              emoji: targetA['emoji']?.toString() ?? '',
+              keywords: List<String>.from(targetA['keywords'] ?? []),
+              comment: targetA['comment']?.toString() ?? '',
+            ),
+        ],
+      ),
+    );
+  }
+
+  // (구) Pro Page 2 외모 점수 — Page 1로 이동됨
+  Widget _buildPage2ProScore() {
     final s = _abilityScores;
     final appearanceScore = analysisResult['appearance_score'] as Map<String, dynamic>?;
 
