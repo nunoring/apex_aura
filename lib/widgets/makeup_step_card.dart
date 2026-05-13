@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'product_chip.dart';
+import 'affiliate_chip.dart';
 
 class MakeupStepCard extends StatelessWidget {
   final int stepNumber;
@@ -56,11 +56,10 @@ class MakeupStepCard extends StatelessWidget {
           Text(description,
               style: const TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 12),
-          ...products.map((p) => ProductChip(
+          ...products.map((p) => AffiliateChip(
                 name: p['name']?.toString() ?? '',
-                shade: p['shade']?.toString(),
-                category: p['category']?.toString(),
-                usage: p['usage']?.toString(),
+                platform: p['platform']?.toString() ?? 'coupang',
+                staticUrl: p['affiliate_url']?.toString(),
               )),
           const SizedBox(height: 8),
           Container(
