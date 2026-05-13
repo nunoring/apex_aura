@@ -14,6 +14,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _ageConfirmed = false;
 
   late AnimationController _scanController;
   late AnimationController _fadeController;
@@ -52,8 +53,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Future<void> _goHome() async {
+    if (!_ageConfirmed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('만 19세 이상 확인에 동의해주세요'),
+          backgroundColor: Color(0xFF2A1A00),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('has_seen_onboarding', true);
+    await prefs.setBool('age_confirmed', true);
+    await prefs.setString('age_confirmed_date', DateTime.now().toIso8601String());
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
@@ -101,9 +114,41 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Container(
       color: const Color(0xFF0D0D0D),
       padding: EdgeInsets.fromLTRB(
-          24, 16, 24, MediaQuery.of(context).padding.bottom + 20),
-      child: Row(
+          24, 12, 24, MediaQuery.of(context).padding.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          // 마지막 페이지: 연령 확인 체크박스
+          if (_currentPage == 2)
+            GestureDetector(
+              onTap: () => setState(() => _ageConfirmed = !_ageConfirmed),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 20, height: 20,
+                      decoration: BoxDecoration(
+                        color: _ageConfirmed ? const Color(0xFFE8D5B7) : Colors.transparent,
+                        border: Border.all(
+                          color: _ageConfirmed ? const Color(0xFFE8D5B7) : const Color(0xFF444444),
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: _ageConfirmed
+                          ? const Icon(Icons.check, size: 14, color: Color(0xFF1A0F00))
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    const Text('본인이 만 19세 이상임을 확인합니다 (필수)',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF888888))),
+                  ],
+                ),
+              ),
+            ),
+          Row(children: [
           // 도트
           Row(
             children: List.generate(3, (i) => AnimatedContainer(
@@ -149,6 +194,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
           ),
+          ]),  // Row (도트 + 버튼)
         ],
       ),
     );

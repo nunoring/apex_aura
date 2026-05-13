@@ -8,6 +8,12 @@ import 'face_detector_service.dart';
 import 'face_selection_screen.dart';
 import 'history_service.dart';
 
+class _AnalysisException implements Exception {
+  final String code;
+  final String message;
+  _AnalysisException(this.code, this.message);
+}
+
 class LoadingScreen extends StatefulWidget {
   final String animalType;
   final double sliderValue;
@@ -200,7 +206,38 @@ class _LoadingScreenState extends State<LoadingScreen>
       });
       _startGptMessages();
 
-      final result = await _getAnalysisWithRetry(faceData);
+      Map<String, dynamic> result;
+      try {
+        result = await _getAnalysisWithRetry(faceData);
+      } on _AnalysisException catch (e) {
+        _timerController.stop();
+        if (mounted) {
+          final isMinor = e.code == 'minor_detected';
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              title: Text(
+                isMinor ? '이용 제한' : '사진 재업로드 필요',
+                style: const TextStyle(color: Color(0xFFE8D5B7)),
+              ),
+              content: Text(e.message,
+                  style: const TextStyle(color: Color(0xFFAAAAAA))),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context); // 다이얼로그
+                    Navigator.pop(context, false); // 로딩화면
+                  },
+                  child: const Text('확인', style: TextStyle(color: Color(0xFFE8D5B7))),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
 
       // Step 4: 결과 생성 완료
       _timerController.stop();
@@ -402,6 +439,12 @@ class _LoadingScreenState extends State<LoadingScreen>
       }),
     );
 
+    if (response.statusCode == 403 || response.statusCode == 400) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final errorCode = body['error']?.toString() ?? '';
+      final message = body['message']?.toString() ?? '다른 사진을 사용해주세요.';
+      throw _AnalysisException(errorCode, message);
+    }
     if (response.statusCode != 200) {
       throw Exception('서버 오류: ${response.statusCode}');
     }

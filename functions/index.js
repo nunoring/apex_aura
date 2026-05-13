@@ -424,6 +424,41 @@ function validateFreeResponse(result) {
   }
 }
 
+// ─── 나이 체크 (미성년자 차단) ────────────────────────────────
+async function checkAge(openai, imageBase64, mimeType = "image/jpeg") {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 50,
+      temperature: 0.1,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `이 사진 속 인물의 연령대를 판단해주세요. 정확한 나이가 아닌 카테고리만:
+- "adult": 명확히 18세 이상 (성인 골격, 성인 외형 등 명확)
+- "minor": 18세 미만으로 보임 (어린이, 청소년 외형)
+- "uncertain": 경계선으로 판단 어려움
+
+반드시 JSON으로만 응답: {"age_category": "adult"}`,
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: "low" },
+          },
+        ],
+      }],
+    });
+    const raw = response.choices[0].message.content.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(raw);
+    return parsed.age_category || "adult";
+  } catch (e) {
+    console.log("checkAge 실패, 통과:", e.message);
+    return "adult"; // 판단 불가 시 분석 진행 (과도한 차단 방지)
+  }
+}
+
 // ─── 메인 함수 ────────────────────────────────────────────────
 exports.analyzeImage = onRequest(
   { timeoutSeconds: 120, memory: "512MiB" },
@@ -445,19 +480,35 @@ exports.analyzeImage = onRequest(
           faceData,
         } = req.body;
 
-        if (!faceData) {
-          return res.status(400).json({ error: "faceData required" });
+        const imgData = base64Image || imageBase64;
+        if (!imgData || !faceData) {
+          return res.status(400).json({ error: "imageBase64 and faceData required" });
         }
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const schemaInstruction = isPro ? PRO_SCHEMA_INSTRUCTION : FREE_SCHEMA_INSTRUCTION;
 
+        // 미성년자 차단 (분석 전 선행 체크)
+        const ageCategory = await checkAge(openai, imgData, mimeType);
+        if (ageCategory === "minor") {
+          return res.status(403).json({
+            error: "minor_detected",
+            message: "본 앱은 만 19세 이상 사용자만 이용 가능합니다. 다른 사진을 업로드해주세요.",
+          });
+        }
+        if (ageCategory === "uncertain") {
+          return res.status(400).json({
+            error: "age_uncertain",
+            message: "정확한 분석을 위해 본인의 정면 사진을 다시 업로드해주세요.",
+          });
+        }
+
+        const schemaInstruction = isPro ? PRO_SCHEMA_INSTRUCTION : FREE_SCHEMA_INSTRUCTION;
         const userPrompt = buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction);
 
-        // 1차 시도 (텍스트 전용 — 이미지 거부 문제 근본 해결)
+        // 1차 시도 (이미지 + 수치 텍스트 동시 분석)
         let result;
         try {
-          result = await callGPT(openai, userPrompt);
+          result = await callGPT(openai, userPrompt, imgData, mimeType);
         } catch (gptErr) {
           console.log("GPT 실패 — 폴백 사용:", gptErr.message);
           result = getFallbackResponse(isPro);
@@ -477,7 +528,7 @@ exports.analyzeImage = onRequest(
             (!isValid && isPro ? "\n\n[중요] makeup_steps 4개, fashion_looks 2개, consultant_report_full 5개 필드 모두 채워주세요." : "");
 
           try {
-            result = await callGPT(openai, retryPrompt);
+            result = await callGPT(openai, retryPrompt, imgData, mimeType);
           } catch (e) {
             result = getFallbackResponse(isPro);
           }
@@ -548,14 +599,26 @@ ${schemaInstruction}`;
 }
 
 // ─── GPT 호출 헬퍼 ────────────────────────────────────────────
-async function callGPT(openai, userPrompt) {
+async function callGPT(openai, userPrompt, imageBase64, mimeType) {
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     max_tokens: 4500,
     temperature: 0.5,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userPrompt },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:${mimeType};base64,${imageBase64}`,
+              detail: "auto",
+            },
+          },
+          { type: "text", text: userPrompt },
+        ],
+      },
     ],
   });
 
