@@ -49,15 +49,13 @@ class _AffiliateChipState extends State<AffiliateChip> {
   Future<void> _open() async {
     if (_url.isEmpty) return;
 
-    try {
-      await FirebaseAnalytics.instance.logEvent(
-        name: 'affiliate_click',
-        parameters: {
-          'platform': widget.platform,
-          'product_name': widget.name,
-        },
-      );
-    } catch (_) {}
+    // Phase 2: 어필리에이트 활성화 시 주석 해제
+    // try {
+    //   await FirebaseAnalytics.instance.logEvent(
+    //     name: 'affiliate_click',
+    //     parameters: {'platform': widget.platform, 'product_name': widget.name},
+    //   );
+    // } catch (_) {}
 
     final uri = Uri.parse(_url);
     if (await canLaunchUrl(uri)) {

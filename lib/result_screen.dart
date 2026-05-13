@@ -593,8 +593,7 @@ class _ResultScreenState extends State<ResultScreen> {
           ] else
             const Center(child: Text('메이크업 데이터가 없어요', style: TextStyle(fontSize: 13, color: Color(0xFF444444)))),
 
-          const SizedBox(height: 16),
-          _buildAffiliateDisclaimer(),
+          // Phase 2: _buildAffiliateDisclaimer() 복원
         ],
       ),
     );
@@ -711,8 +710,7 @@ class _ResultScreenState extends State<ResultScreen> {
               elevation: 0,
             ),
           ),
-          const SizedBox(height: 16),
-          _buildAffiliateDisclaimer(),
+          // Phase 2: _buildAffiliateDisclaimer() 복원
         ],
       ),
     );
@@ -743,21 +741,19 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  Widget _buildAffiliateDisclaimer() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Text(
-        '이 페이지의 제품 추천은 쿠팡 파트너스 활동의 일환으로,\n이에 따른 일정액의 수수료를 제공받습니다.',
-        style: TextStyle(color: Colors.white54, fontSize: 11),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
+  // Phase 2: 어필리에이트 활성화 시 주석 해제
+  // Widget _buildAffiliateDisclaimer() {
+  //   return Container(
+  //     width: double.infinity,
+  //     padding: const EdgeInsets.all(12),
+  //     decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(8)),
+  //     child: const Text(
+  //       '이 페이지의 제품 추천은 쿠팡 파트너스 활동의 일환으로,\n이에 따른 일정액의 수수료를 제공받습니다.',
+  //       style: TextStyle(color: Colors.white54, fontSize: 11),
+  //       textAlign: TextAlign.center,
+  //     ),
+  //   );
+  // }
 
   Widget _buildPlaceholderPage(String title, IconData icon) {
     return Center(

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'affiliate_chip.dart';
+import 'product_chip.dart';
 
 class FashionLookCard extends StatelessWidget {
   final String name;
@@ -32,31 +32,15 @@ class FashionLookCard extends StatelessWidget {
                   fontSize: 16)),
           const SizedBox(height: 8),
           Text(rationale,
-              style: const TextStyle(
-                  color: Colors.white60, fontSize: 13)),
+              style: const TextStyle(color: Colors.white60, fontSize: 13)),
           const SizedBox(height: 12),
-          ...items.map((item) {
-            final aff = item['affiliate'] as Map?;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${item['category']} — ${item['description']}',
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 13),
+          ...items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ProductChip(
+                  name: '${item['category'] ?? ''} — ${item['description'] ?? ''}',
+                  usage: item['rationale']?.toString(),
                 ),
-                if (aff != null) ...[
-                  const SizedBox(height: 6),
-                  AffiliateChip(
-                    name: aff['name']?.toString() ?? '',
-                    url: aff['url']?.toString() ?? '',
-                    platform: aff['platform']?.toString() ?? 'coupang',
-                  ),
-                ],
-                const SizedBox(height: 8),
-              ],
-            );
-          }),
+              )),
         ],
       ),
     );
