@@ -318,10 +318,10 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       "step_name": "기초",
       "description": "기초 단계 설명 (카피 톤, 20자 이상)",
       "products": [
-        {"name": "한율 부들밤 모공수축패드", "shade": null, "category": "토너패드", "usage": "AHA 성분으로 각질 정리, 세안 후 바로 사용", "search_query": "한율 부들밤 모공수축패드"},
-        {"name": "라운드랩 1025 독도 토너", "shade": null, "category": "토너", "usage": "수분 흡수 후 가볍게 두드려 흡수", "search_query": "라운드랩 1025 독도 토너"},
-        {"name": "넘버즈인 세럼", "shade": null, "category": "세럼", "usage": "피부결 따라 세로로 흡수", "search_query": "넘버즈인 세럼"},
-        {"name": "구셀 메이크업 베이스", "shade": null, "category": "베이스", "usage": "얇게 전체 도포 후 30초 흡수", "search_query": "구셀 메이크업 베이스"}
+        {"name": "한율 부들밤 모공수축패드", "shade": null, "category": "토너패드", "usage": "AHA 성분으로 각질 정리, 세안 후 바로 사용"},
+        {"name": "라운드랩 1025 독도 토너", "shade": null, "category": "토너", "usage": "수분 흡수 후 가볍게 두드려 흡수" "라운드랩 1025 독도 토너"},
+        {"name": "넘버즈인 세럼", "shade": null, "category": "세럼", "usage": "피부결 따라 세로로 흡수" "넘버즈인 세럼"},
+        {"name": "구셀 메이크업 베이스", "shade": null, "category": "베이스", "usage": "얇게 전체 도포 후 30초 흡수" "구셀 메이크업 베이스"}
       ],
       "tip": "묽은 제형부터 무거운 제형 순서로, 피부결 따라 세로로 흡수시켜줘요"
     },
@@ -330,9 +330,9 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       "step_name": "베이스",
       "description": "피부 톤 균일화 단계 (카피 톤, 20자 이상)",
       "products": [
-        {"name": "비레디 블루 파운데이션 03호", "shade": "03호", "category": "파운데이션", "usage": "소량을 전체적으로 가볍게 펴바르기", "search_query": "비레디 블루 파운데이션"},
-        {"name": "루나 롱래스팅 팁 컨실러 픽싱핏 04호", "shade": "04호 샌드", "category": "컨실러", "usage": "잡티와 다크서클 위에 두드려 커버", "search_query": "루나 롱래스팅 컨실러 픽싱핏"},
-        {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "파우더", "usage": "T존 중심으로 살짝 눌러 마무리", "search_query": "스킨푸드 피치뽀송 멀티 피니시 파우더"}
+        {"name": "비레디 블루 파운데이션 03호", "shade": "03호", "category": "파운데이션", "usage": "소량을 전체적으로 가볍게 펴바르기" "비레디 블루 파운데이션"},
+        {"name": "루나 롱래스팅 팁 컨실러 픽싱핏 04호", "shade": "04호 샌드", "category": "컨실러", "usage": "잡티와 다크서클 위에 두드려 커버" "루나 롱래스팅 컨실러 픽싱핏"},
+        {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "파우더", "usage": "T존 중심으로 살짝 눌러 마무리" "스킨푸드 피치뽀송 멀티 피니시 파우더"}
       ],
       "tip": "포인트는 소량이에요. 티 안 나게 자연스럽게 얹어주는 게 핵심이거든요"
     },
@@ -341,9 +341,9 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       "step_name": "음영",
       "description": "눈썹-쉐딩-립 순서로 인상 정돈 (카피 톤, 20자 이상)",
       "products": [
-        {"name": "클리오 킬브로우 오토하드펜슬 05호 그레이브라운", "shade": "05호", "category": "눈썹", "usage": "눈썹 결 따라 그린 후 스크류로 빗어주기", "search_query": "클리오 킬브로우 오토하드펜슬"},
-        {"name": "투쿨포스쿨 뉴트럴 쉐딩", "shade": null, "category": "쉐딩", "usage": "얼굴 윤곽 바깥쪽에만 살짝 블렌딩", "search_query": "투쿨포스쿨 뉴트럴 쉐딩"},
-        {"name": "롬앤 쥬시 래스팅 틴트 06피그피그", "shade": "06 피그피그", "category": "립", "usage": "입술 안쪽부터 자연스럽게 펴 바르기", "search_query": "롬앤 쥬시 래스팅 틴트 06"}
+        {"name": "클리오 킬브로우 오토하드펜슬 05호 그레이브라운", "shade": "05호", "category": "눈썹", "usage": "눈썹 결 따라 그린 후 스크류로 빗어주기" "클리오 킬브로우 오토하드펜슬"},
+        {"name": "투쿨포스쿨 뉴트럴 쉐딩", "shade": null, "category": "쉐딩", "usage": "얼굴 윤곽 바깥쪽에만 살짝 블렌딩" "투쿨포스쿨 뉴트럴 쉐딩"},
+        {"name": "롬앤 쥬시 래스팅 틴트 06피그피그", "shade": "06 피그피그", "category": "립", "usage": "입술 안쪽부터 자연스럽게 펴 바르기" "롬앤 쥬시 래스팅 틴트 06"}
       ],
       "tip": "쉐딩은 얼굴 윤곽 바깥쪽에만 살짝. 과하면 어색해 보여요"
     },
@@ -352,8 +352,8 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       "step_name": "마무리",
       "description": "지속력 확보 마무리 단계 (카피 톤, 20자 이상)",
       "products": [
-        {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "세팅파우더", "usage": "전체적으로 가볍게 눌러 세팅", "search_query": "스킨푸드 피치뽀송 멀티 피니시 파우더"},
-        {"name": "어반디케이 메이크업 픽서", "shade": null, "category": "픽서", "usage": "20cm 거리에서 가볍게 두 번 분사", "search_query": "어반디케이 메이크업 픽서"}
+        {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "세팅파우더", "usage": "전체적으로 가볍게 눌러 세팅" "스킨푸드 피치뽀송 멀티 피니시 파우더"},
+        {"name": "어반디케이 메이크업 픽서", "shade": null, "category": "픽서", "usage": "20cm 거리에서 가볍게 두 번 분사" "어반디케이 메이크업 픽서"}
       ],
       "tip": "픽서는 20cm 거리에서 가볍게 두 번. 효율적인 마무리 방법이에요"
     }
@@ -362,11 +362,11 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
     {
       "name": "데일리 캐주얼",
       "items": [
-        {"category": "Outer", "description": "화이트 린넨 셔츠 (오버사이즈)", "rationale": "청량감 + 레이어드 가능", "search_query": "화이트 린넨 셔츠 오버사이즈"},
-        {"category": "Top", "description": "화이트 반팔 코튼 이너", "rationale": "정돈된 레이어드", "search_query": "화이트 반팔 코튼 티셔츠},
-        {"category": "Bottom", "description": "와이드 연청 데님 팬츠", "rationale": "와이드 핏으로 하체 라인 정돈", "search_query": "와이드 연청 데님 팬츠},
-        {"category": "Shoes", "description": "화이트 로우 스니커즈", "rationale": "색감 통일, 캐주얼 강조", "search_query": "화이트 로우 스니커즈},
-        {"category": "Acc", "description": "검정 가죽 벨트 (슬림)", "rationale": "포인트 + 허리 라인", "search_query": "검정 가죽 벨트 슬림}
+        {"category": "Outer", "description": "화이트 린넨 셔츠 (오버사이즈)", "rationale": "청량감 + 레이어드 가능" "화이트 린넨 셔츠 오버사이즈"},
+        {"category": "Top", "description": "화이트 반팔 코튼 이너", "rationale": "정돈된 레이어드" "화이트 반팔 코튼 티셔츠},
+        {"category": "Bottom", "description": "와이드 연청 데님 팬츠", "rationale": "와이드 핏으로 하체 라인 정돈" "와이드 연청 데님 팬츠},
+        {"category": "Shoes", "description": "화이트 로우 스니커즈", "rationale": "색감 통일, 캐주얼 강조" "화이트 로우 스니커즈},
+        {"category": "Acc", "description": "검정 가죽 벨트 (슬림)", "rationale": "포인트 + 허리 라인" "검정 가죽 벨트 슬림}
       ],
       "rationale": "셔츠는 빼서 입고, 이너는 넣어서 입어요. 화이트+연청 조합으로 청량감 있어요",
       "styling_tip": "셔츠는 빼서, 이너는 넣어서",
@@ -375,11 +375,11 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
     {
       "name": "세미 포멀",
       "items": [
-        {"category": "Outer", "description": "검정 반팔 셔츠 (슬림핏 X, 레귤러 핏)", "rationale": "깔끔하고 정돈된 인상", "search_query": "검정 반팔 셔츠 레귤러핏},
-        {"category": "Top", "description": "검정 이너 (넣어 입기용)", "rationale": "셔츠 넣입 깔끔하게", "search_query": "검정 이너 넣어입기},
-        {"category": "Bottom", "description": "회색 세미와이드 슬랙스", "rationale": "정돈된 라인, 격식 있는 분위기", "search_query": "회색 세미와이드 슬랙스},
-        {"category": "Shoes", "description": "앵클부츠 (키높이 깔창 활용)", "rationale": "키 보정 + 포멀한 인상", "search_query": "앵클부츠 남성},
-        {"category": "Acc", "description": "검정 가죽 벨트", "rationale": "상하의 통일감", "search_query": "검정 가죽 벨트}
+        {"category": "Outer", "description": "검정 반팔 셔츠 (슬림핏 X, 레귤러 핏)", "rationale": "깔끔하고 정돈된 인상" "검정 반팔 셔츠 레귤러핏},
+        {"category": "Top", "description": "검정 이너 (넣어 입기용)", "rationale": "셔츠 넣입 깔끔하게" "검정 이너 넣어입기},
+        {"category": "Bottom", "description": "회색 세미와이드 슬랙스", "rationale": "정돈된 라인, 격식 있는 분위기" "회색 세미와이드 슬랙스},
+        {"category": "Shoes", "description": "앵클부츠 (키높이 깔창 활용)", "rationale": "키 보정 + 포멀한 인상" "앵클부츠 남성},
+        {"category": "Acc", "description": "검정 가죽 벨트", "rationale": "상하의 통일감" "검정 가죽 벨트}
       ],
       "rationale": "검정 셔츠 넣어 입기로 깔끔하게. 회색 와이드로 하체 비율 보완이 효율적이에요",
       "styling_tip": "검정 셔츠는 꼭 넣어서, 슬랙스는 허리에 맞게",
@@ -857,10 +857,10 @@ function getFallbackResponse(isPro) {
         step_number: 1, step_name: "기초",
         description: "묽은 제형부터 무거운 제형 순서로, 피부 결 따라 세로로 흡수시켜줘요.",
         products: [
-          { name: "한율 부들밤 모공수축패드", shade: null, platform: "coupang", affiliate_url: "" },
-          { name: "라운드랩 1025 독도 토너", shade: null, platform: "coupang", affiliate_url: "" },
-          { name: "넘버즈인 세럼", shade: null, platform: "coupang", affiliate_url: "" },
-          { name: "구셀 메이크업 베이스", shade: null, platform: "coupang", affiliate_url: "" },
+          { name: "한율 부들밤 모공수축패드", shade: null },
+          { name: "라운드랩 1025 독도 토너", shade: null },
+          { name: "넘버즈인 세럼", shade: null },
+          { name: "구셀 메이크업 베이스", shade: null },
         ],
         tip: "기초는 레이어링이 핵심이에요. 각 단계 30초 간격으로 흡수시켜주세요.",
       },
@@ -868,9 +868,9 @@ function getFallbackResponse(isPro) {
         step_number: 2, step_name: "베이스",
         description: "파운데이션으로 피부 톤을 균일하게 잡아주는 단계예요.",
         products: [
-          { name: "비레디 블루 파운데이션 03호", shade: "03호", platform: "coupang", affiliate_url: "" },
-          { name: "루나 롱래스팅 팁 컨실러 픽싱핏 04호", shade: "04호", platform: "coupang", affiliate_url: "" },
-          { name: "스킨푸드 피치뽀송 멀티 피니시 파우더", shade: null, platform: "coupang", affiliate_url: "" },
+          { name: "비레디 블루 파운데이션 03호", shade: "03호" },
+          { name: "루나 롱래스팅 팁 컨실러 픽싱핏 04호", shade: "04호" },
+          { name: "스킨푸드 피치뽀송 멀티 피니시 파우더", shade: null },
         ],
         tip: "포인트는 소량이에요. 티 안 나게 자연스럽게 얹어주는 게 핵심이거든요.",
       },
@@ -878,9 +878,9 @@ function getFallbackResponse(isPro) {
         step_number: 3, step_name: "음영",
         description: "눈썹 → 쉐딩 → 립 순서로. 눈썹으로 구레나룻/애교살까지 정리할 수 있어요.",
         products: [
-          { name: "클리오 킬브로우 오토하드펜슬 05호 그레이브라운", shade: "05호", platform: "coupang", affiliate_url: "" },
-          { name: "투쿨포스쿨 뉴트럴 쉐딩", shade: null, platform: "coupang", affiliate_url: "" },
-          { name: "롬앤 쥬시 래스팅 틴트 06피그피그", shade: "06호", platform: "coupang", affiliate_url: "" },
+          { name: "클리오 킬브로우 오토하드펜슬 05호 그레이브라운", shade: "05호" },
+          { name: "투쿨포스쿨 뉴트럴 쉐딩", shade: null },
+          { name: "롬앤 쥬시 래스팅 틴트 06피그피그", shade: "06호" },
         ],
         tip: "쉐딩은 얼굴 윤곽 바깥쪽에만 살짝. 과하면 어색해 보여요.",
       },
@@ -888,8 +888,8 @@ function getFallbackResponse(isPro) {
         step_number: 4, step_name: "마무리",
         description: "파우더와 픽서로 하루 종일 유지되게 마무리해줘요.",
         products: [
-          { name: "스킨푸드 피치뽀송 멀티 피니시 파우더", shade: null, platform: "coupang", affiliate_url: "" },
-          { name: "어반디케이 메이크업 픽서", shade: null, platform: "coupang", affiliate_url: "" },
+          { name: "스킨푸드 피치뽀송 멀티 피니시 파우더", shade: null },
+          { name: "어반디케이 메이크업 픽서", shade: null },
         ],
         tip: "픽서는 20cm 거리에서 가볍게 두 번. 효율적인 마무리 방법이에요.",
       },

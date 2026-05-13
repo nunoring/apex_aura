@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'affiliate_chip.dart';
 
 class FashionLookCard extends StatelessWidget {
   final String name;
@@ -34,34 +33,13 @@ class FashionLookCard extends StatelessWidget {
           Text(rationale,
               style: const TextStyle(color: Colors.white60, fontSize: 13)),
           const SizedBox(height: 12),
-          ...items.map((item) {
-            final aff = item['affiliate'] as Map?;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${item['category'] ?? ''} — ${item['description'] ?? ''}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  if (aff != null) ...[
-                    const SizedBox(height: 6),
-                    AffiliateChip(
-                      name: aff['name']?.toString() ?? item['description']?.toString() ?? '',
-                      platform: aff['platform']?.toString() ?? 'coupang',
-                      staticUrl: aff['url']?.toString(),
-                    ),
-                  ] else
-                    AffiliateChip(
-                      name: item['description']?.toString() ?? '',
-                      platform: 'coupang',
-                      staticUrl: null,
-                    ),
-                ],
-              ),
-            );
-          }),
+          ...items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '${item['category'] ?? ''}  ${item['description'] ?? ''}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              )),
         ],
       ),
     );

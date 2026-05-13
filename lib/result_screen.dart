@@ -8,11 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'dart:ui' as dart_ui;
-import 'package:gal/gal.dart';
 import 'subscription_service.dart';
 import 'paywall_screen.dart';
-import 'services/pdf_service.dart';
 import 'services/share_service.dart';
 import 'widgets/animal_compare_card.dart';
 import 'widgets/gap_progress_bar.dart';
@@ -23,7 +20,6 @@ import 'widgets/appearance_score_widget.dart';
 import 'widgets/grooming_keyword_chip.dart';
 import 'widgets/three_factor_hub.dart';
 import 'widgets/makeup_step_card.dart';
-import 'widgets/affiliate_chip.dart';
 import 'widgets/fashion_look_card.dart';
 import 'widgets/color_palette_guide.dart';
 import 'widgets/result_cta.dart';
@@ -702,32 +698,6 @@ class _ResultScreenState extends State<ResultScreen> {
           ],
 
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _isSharing ? null : _saveLongImage,
-            icon: const Icon(Icons.photo_library_outlined, size: 18),
-            label: const Text('현재 화면 갤러리 저장'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E1E1E),
-              foregroundColor: const Color(0xFFE8D5B7),
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 0,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: () => PdfService.generateAndOpen(analysisResult),
-            icon: const Icon(Icons.download, size: 18),
-            label: const Text('전체 분석 PDF 저장'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE8D5B7),
-              foregroundColor: Colors.black,
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 0,
-            ),
-          ),
-          // Phase 2: _buildAffiliateDisclaimer() 복원
         ],
       ),
     );
@@ -757,20 +727,6 @@ class _ResultScreenState extends State<ResultScreen> {
       ),
     );
   }
-
-  // Phase 2: 어필리에이트 활성화 시 주석 해제
-  // Widget _buildAffiliateDisclaimer() {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: const EdgeInsets.all(12),
-  //     decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(8)),
-  //     child: const Text(
-  //       '이 페이지의 제품 추천은 쿠팡 파트너스 활동의 일환으로,\n이에 따른 일정액의 수수료를 제공받습니다.',
-  //       style: TextStyle(color: Colors.white54, fontSize: 11),
-  //       textAlign: TextAlign.center,
-  //     ),
-  //   );
-  // }
 
   Widget _buildPlaceholderPage(String title, IconData icon) {
     return Center(
@@ -2671,44 +2627,6 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   // 긴 이미지 저장 — 현재 페이지 캡처 후 갤러리 저장
-  Future<void> _saveLongImage() async {
-    if (_isSharing) return;
-    setState(() => _isSharing = true);
-    try {
-      final boundary = _shareKey.currentContext?.findRenderObject()
-          as RenderRepaintBoundary?;
-      if (boundary == null) {
-        // shareKey 없으면 현재 페이지 전체를 screenshot으로 캡처
-        final image = await _screenshotController.captureFromWidget(
-          _buildShareCard(), pixelRatio: 3.0, context: context);
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/apex_aura_long.png');
-        await file.writeAsBytes(image);
-        await Gal.putImage(file.path, album: 'Apex Aura');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('갤러리에 저장됐어요'), duration: Duration(seconds: 2)));
-        }
-        return;
-      }
-      final img = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await img.toByteData(format: dart_ui.ImageByteFormat.png);
-      if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/apex_aura_long.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
-      await Gal.putImage(file.path, album: 'Apex Aura');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('갤러리에 저장됐어요'), duration: Duration(seconds: 2)));
-      }
-    } catch (e) {
-      debugPrint('saveLongImage error: $e');
-    } finally {
-      if (mounted) setState(() => _isSharing = false);
-    }
-  }
-
   Widget _buildCurrentFaceTypeCard() {
     final currentType = faceData['current_face_type']?.toString();
     final info = currentType != null ? _faceTypeInfo[currentType] : null;
