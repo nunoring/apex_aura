@@ -212,7 +212,7 @@ class _LoadingScreenState extends State<LoadingScreen>
       } on _AnalysisException catch (e) {
         _timerController.stop();
         if (mounted) {
-          final isMinor = e.code == 'minor_detected';
+          final isMinor = e.code == 'minor_detected' || e.code == 'age_restriction';
           await showDialog(
             context: context,
             barrierDismissible: false,

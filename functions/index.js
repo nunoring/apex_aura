@@ -451,12 +451,12 @@ async function checkAge(openai, imageBase64, mimeType = "image/jpeg") {
         content: [
           {
             type: "text",
-            text: `이 사진 속 인물의 연령대를 판단해주세요. 정확한 나이가 아닌 카테고리만:
-- "adult": 명확히 18세 이상 (성인 골격, 성인 외형 등 명확)
-- "minor": 18세 미만으로 보임 (어린이, 청소년 외형)
-- "uncertain": 경계선으로 판단 어려움
+            text: `이 사진의 인물이 만 14세 이상인지 판단하세요.
+- "ok": 14세 이상 명확 (성인 또는 청소년 이상)
+- "minor": 14세 미만 명확 (어린이 외형)
+- "uncertain": 판단 어려움
 
-반드시 JSON으로만 응답: {"age_category": "adult"}`,
+JSON만: {"result": "ok"}`,
           },
           {
             type: "image_url",
@@ -467,10 +467,10 @@ async function checkAge(openai, imageBase64, mimeType = "image/jpeg") {
     });
     const raw = response.choices[0].message.content.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(raw);
-    return parsed.age_category || "adult";
+    return parsed.result || "ok";
   } catch (e) {
     console.log("checkAge 실패, 통과:", e.message);
-    return "adult"; // 판단 불가 시 분석 진행 (과도한 차단 방지)
+    return "ok"; // 판단 불가 시 분석 진행 (과도한 차단 방지)
   }
 }
 
@@ -502,18 +502,13 @@ exports.analyzeImage = onRequest(
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-        // 미성년자 차단 (분석 전 선행 체크)
-        const ageCategory = await checkAge(openai, imgData, mimeType);
-        if (ageCategory === "minor") {
+        // 미성년자 차단 — 14세 미만 GPT 이중 안전망
+        const ageResult = await checkAge(openai, imgData, mimeType);
+        console.log("연령 체크 결과:", ageResult);
+        if (ageResult !== "ok") {
           return res.status(403).json({
-            error: "minor_detected",
-            message: "본 앱은 만 19세 이상 사용자만 이용 가능합니다. 다른 사진을 업로드해주세요.",
-          });
-        }
-        if (ageCategory === "uncertain") {
-          return res.status(400).json({
-            error: "age_uncertain",
-            message: "정확한 분석을 위해 본인의 정면 사진을 다시 업로드해주세요.",
+            error: "age_restriction",
+            message: "본 앱은 만 14세 이상만 이용 가능합니다. 본인 사진을 다시 확인해주세요.",
           });
         }
 
