@@ -192,6 +192,8 @@ const PRO_SCHEMA_INSTRUCTION = `
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
 
 CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
+- scores 각 항목(eye/balance/face_shape/eye_distance/skin): 0.0~10.0 범위 실수
+- appearance_score.score: 60~85 범위 정수 (100 금지), scores 5개 평균 기반 산출
 - first_impression.animal_match.percentage: 60~95 범위 (100 금지)
 - first_impression.animal_match.similarity_points: 정확히 3개, 각 30자↑, 일반론 금지
 - first_impression.main_animal.strengths: 정확히 3개, 각 description 30자↑
@@ -238,6 +240,17 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
         "세 번째 유사 포인트 (30자 이상, 구체적으로)"
       ]
     }
+  },
+  "scores": {
+    "eye": 0.0,
+    "balance": 0.0,
+    "face_shape": 0.0,
+    "eye_distance": 0.0,
+    "skin": 0.0
+  },
+  "appearance_score": {
+    "score": 0,
+    "max_score": 100
   },
   "face_analysis": {
     "ratio_horizontal_vertical": "1:1.XX",
@@ -476,6 +489,16 @@ function validateProResponse(result) {
   if (!validateAnimalRanking(result)) return false;
   if (!validateAnimalMatch(result)) return false;
   try {
+    // scores 검증
+    const scores = result.scores;
+    if (!scores) return false;
+    for (const key of ['eye', 'balance', 'face_shape', 'eye_distance', 'skin']) {
+      if (typeof scores[key] !== 'number' || scores[key] < 0 || scores[key] > 10) return false;
+    }
+    // appearance_score 검증
+    const as = result.appearance_score;
+    if (!as || typeof as.score !== 'number') return false;
+    if (as.score < 60 || as.score > 85) return false;
     // 컨설턴트 리포트 4요소
     const report = result.consultant_report_full;
     if (!report) return false;
@@ -801,6 +824,8 @@ function getFallbackResponse(isPro) {
         "눈매와 헤어 스타일링으로 시선 분산이 가능한 구조예요.",
       ],
     },
+    scores: { eye: 6.8, balance: 7.2, face_shape: 7.5, eye_distance: 6.5, skin: 6.8 },
+    appearance_score: { score: 72, max_score: 100 },
     grooming_keywords: ["생기있는", "동안", "활동적인", "외향적인", "유머러스한", "캐주얼"],
     radar: {
       current: { 눈매: 0.4, 코: 0.6, 얼굴윤곽: 0.55, 스타일: 0.35 },

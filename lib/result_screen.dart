@@ -109,17 +109,19 @@ class _ResultScreenState extends State<ResultScreen> {
     final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
     final animalMatch = fi?['animal_match'] as Map<String, dynamic>?;
     final mainAnimal = fi?['main_animal'] as Map<String, dynamic>?;
+    final appearanceScore = analysisResult['appearance_score'] as Map<String, dynamic>?;
+    final rawScores = analysisResult['scores'] as Map<String, dynamic>?;
 
     return SingleChildScrollView(
       child: Column(
         children: [
           _buildPage1(),
-          if (animalMatch != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (animalMatch != null) ...[
                   const Divider(color: Color(0xFF1E1E1E)),
                   const SizedBox(height: 12),
                   AnimalMatchWidget(
@@ -128,8 +130,23 @@ class _ResultScreenState extends State<ResultScreen> {
                     similarityPoints: List<String>.from(animalMatch['similarity_points'] ?? []),
                   ),
                 ],
-              ),
+                if (appearanceScore != null && rawScores != null) ...[
+                  const SizedBox(height: 16),
+                  AppearanceScoreWidget(
+                    score: (appearanceScore['score'] as num?)?.toInt() ?? 70,
+                    maxScore: (appearanceScore['max_score'] as num?)?.toInt() ?? 100,
+                    scores: {
+                      'eye': (rawScores['eye'] as num?)?.toDouble() ?? 6.5,
+                      'balance': (rawScores['balance'] as num?)?.toDouble() ?? 6.5,
+                      'face_shape': (rawScores['face_shape'] as num?)?.toDouble() ?? 6.5,
+                      'eye_distance': (rawScores['eye_distance'] as num?)?.toDouble() ?? 6.5,
+                      'skin': (rawScores['skin'] as num?)?.toDouble() ?? 6.5,
+                    },
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
