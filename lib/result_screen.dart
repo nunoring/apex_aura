@@ -31,6 +31,7 @@ import 'widgets/free_lock_teaser.dart';
 import 'widgets/free_limit_disclaimer.dart';
 import 'widgets/price_comparison_widget.dart';
 import 'widgets/pro_paywall_sheet.dart';
+import 'widgets/animal_match_widget.dart';
 import 'widgets/main_animal_flip_card.dart';
 import 'widgets/sub_animal_card.dart';
 import 'widgets/target_animal_card.dart';
@@ -105,91 +106,30 @@ class _ResultScreenState extends State<ResultScreen> {
 
   // ─── Pro Page 1: 첫인상 + 외모 점수 ─────────────────────────────
   Widget _buildPage1Pro() {
-    final s = _abilityScores;
-    final appearanceScore = analysisResult['appearance_score'] as Map<String, dynamic>?;
+    final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
+    final animalMatch = fi?['animal_match'] as Map<String, dynamic>?;
+    final mainAnimal = fi?['main_animal'] as Map<String, dynamic>?;
 
     return SingleChildScrollView(
       child: Column(
         children: [
-          // 기존 Page1 콘텐츠 (사진 + 동물상 배지 + 갭 분석)
-          // _buildPage1()은 SingleChildScrollView라 직접 내용을 재사용
           _buildPage1(),
-          // 외모 점수 섹션
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Divider(color: Color(0xFF1E1E1E)),
-                const SizedBox(height: 12),
-                const Text('스타일 완성도',
-                    style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                // 총점
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111111),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+          if (animalMatch != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(color: Color(0xFF1E1E1E)),
+                  const SizedBox(height: 12),
+                  AnimalMatchWidget(
+                    animalType: mainAnimal?['name']?.toString() ?? widget.animalType,
+                    percentage: (animalMatch['percentage'] as num?)?.toInt() ?? 80,
+                    similarityPoints: List<String>.from(animalMatch['similarity_points'] ?? []),
                   ),
-                  child: Column(
-                    children: [
-                      Row(children: [
-                        Text('${appearanceScore?['score'] ?? s.total}',
-                            style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, color: s.tierColor)),
-                        const Text(' / 100', style: TextStyle(fontSize: 16, color: Color(0xFF444444))),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: s.tierColor.withAlpha(30),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(s.tier, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: s.tierColor)),
-                        ),
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(
-                        appearanceScore?['tier_description']?.toString() ?? s.tagline,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // 항목별 바
-                ...s.stats.map((stat) {
-                  final label = stat.$1;
-                  final score = stat.$2;
-                  final color = score >= 70 ? const Color(0xFF27AE60) : score >= 50 ? const Color(0xFFE8A030) : const Color(0xFFC0392B);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFAAAAAA))),
-                          const Spacer(),
-                          Text('$score', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-                        ]),
-                        const SizedBox(height: 3),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
-                          child: LinearProgressIndicator(
-                            value: score / 100,
-                            backgroundColor: const Color(0xFF222222),
-                            valueColor: AlwaysStoppedAnimation<Color>(color),
-                            minHeight: 5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

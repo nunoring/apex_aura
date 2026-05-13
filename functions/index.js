@@ -123,13 +123,15 @@ const FREE_SCHEMA_INSTRUCTION = `
       "emoji": "🦊",
       "keywords": ["세련됨", "정돈됨"],
       "comment": "목표 동물상 설명 (20자 이상, 카피 톤)"
+    },
+    "animal_match": {
+      "percentage": 82,
+      "similarity_points": [
+        "관찰한 특징 + 인상 효과 설명 (30자 이상, 구체적으로)",
+        "두 번째 유사 포인트 (30자 이상, 구체적으로)",
+        "세 번째 유사 포인트 (30자 이상, 구체적으로)"
+      ]
     }
-  },
-  "scores": {
-    "symmetry": 0.0,
-    "skin": 0.0,
-    "features": 0.0,
-    "overall_impression": 0.0
   },
   "comparison": {
     "current_animal": "현재 동물상",
@@ -179,6 +181,8 @@ const PRO_SCHEMA_INSTRUCTION = `
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
 
 CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
+- first_impression.animal_match.percentage: 60~95 범위 (100 금지)
+- first_impression.animal_match.similarity_points: 정확히 3개, 각 30자↑, 일반론 금지
 - first_impression.main_animal.strengths: 정확히 3개, 각 description 30자↑
 - first_impression.main_animal.tip: 30자↑
 - first_impression.sub_animal.comment: 30자↑
@@ -214,13 +218,15 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       "emoji": "🦊",
       "keywords": ["세련됨", "정돈됨"],
       "comment": "스타일링으로 도달 가능한 목표예요 (20자 이상)"
+    },
+    "animal_match": {
+      "percentage": 82,
+      "similarity_points": [
+        "관찰한 특징 + 그게 만드는 인상 효과 (30자 이상, 구체적으로)",
+        "두 번째 유사 포인트 (30자 이상, 구체적으로)",
+        "세 번째 유사 포인트 (30자 이상, 구체적으로)"
+      ]
     }
-  },
-  "scores": {
-    "symmetry": 0.0,
-    "skin": 0.0,
-    "features": 0.0,
-    "overall_impression": 0.0
   },
   "face_analysis": {
     "ratio_horizontal_vertical": "1:1.XX",
@@ -228,12 +234,6 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
     "middle_face_percent": 0,
     "bottom_face_percent": 0,
     "details": ["세부 특징 1 (20자 이상)", "세부 특징 2 (20자 이상)", "세부 특징 3 (20자 이상)"]
-  },
-  "appearance_score": {
-    "score": 0.0,
-    "current_limit": 0.0,
-    "optimized_limit": 0.0,
-    "tier_description": "스타일링 완성도 설명 1~2문장 (30자 이상, 카피 톤 적용)"
   },
   "grooming_keywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5", "키워드6"],
   "radar": {
@@ -351,11 +351,24 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
 }
 
 모든 숫자 필드는 실제 숫자로. 문자열 필드는 카피 톤 규칙 적용.
-radar 값은 0.0~1.0 범위. scores 각 항목은 0.0~10.0 범위.
-appearance_score.score는 스타일링 완성도 지표로 6.0~8.0 범위.
+radar 값은 0.0~1.0 범위. animal_match.percentage는 60~95 정수.
 makeup_steps는 반드시 4개, fashion_looks는 반드시 2개여야 합니다.`;
 
 // ─── 응답 검증 ────────────────────────────────────────────────
+function validateAnimalMatch(result) {
+  try {
+    const am = result.first_impression?.animal_match;
+    if (!am) return false;
+    if (typeof am.percentage !== 'number') return false;
+    if (am.percentage < 60 || am.percentage > 95) return false;
+    if (!am.similarity_points || am.similarity_points.length !== 3) return false;
+    for (const p of am.similarity_points) {
+      if (!p || p.length < 20) return false;
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
 function validateAnimalRanking(result) {
   try {
     const fi = result.first_impression;
@@ -381,6 +394,7 @@ function validateAnimalRanking(result) {
 
 function validateProResponse(result) {
   if (!validateAnimalRanking(result)) return false;
+  if (!validateAnimalMatch(result)) return false;
   try {
     // 컨설턴트 리포트 4요소
     const report = result.consultant_report_full;
@@ -413,6 +427,7 @@ function validateProResponse(result) {
 
 function validateFreeResponse(result) {
   if (!validateAnimalRanking(result)) return false;
+  if (!validateAnimalMatch(result)) return false;
   try {
     if (!result.first_impression?.summary) return false;
     if (!result.action_cards || result.action_cards.length < 3) return false;
@@ -660,8 +675,15 @@ function getFallbackResponse(isPro) {
         keywords: ["세련됨", "정돈됨"],
         comment: "스타일링으로 충분히 도달 가능한 목표예요.",
       },
+      animal_match: {
+        percentage: 82,
+        similarity_points: [
+          "부드러운 눈매 라인이 강아지상 특유의 친근하고 따뜻한 인상을 자연스럽게 만들어줘요.",
+          "표정에서 힘을 빼도 편안하게 보이는 구조가 이 동물상의 핵심 매력이에요.",
+          "얼굴 윤곽선의 곡선이 부드러워서 처음 보는 사람에게 호감을 주는 인상이에요.",
+        ],
+      },
     },
-    scores: { symmetry: 7.0, skin: 6.5, features: 6.8, overall_impression: 6.8 },
     comparison: {
       current_animal: "강아지상",
       target_animal: "여우상",
@@ -710,12 +732,6 @@ function getFallbackResponse(isPro) {
         "하안부가 표준보다 약간 길어서 갸름한 인상을 줘요.",
         "눈매와 헤어 스타일링으로 시선 분산이 가능한 구조예요.",
       ],
-    },
-    appearance_score: {
-      score: 6.8,
-      current_limit: 7.0,
-      optimized_limit: 7.8,
-      tier_description: "현재 6점대 후반으로, 스타일링 최적화 시 7점대 후반까지 충분히 도달할 수 있어요.",
     },
     grooming_keywords: ["생기있는", "동안", "활동적인", "외향적인", "유머러스한", "캐주얼"],
     radar: {
