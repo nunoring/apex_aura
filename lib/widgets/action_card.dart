@@ -49,42 +49,57 @@ class _ActionCardState extends State<ActionCard> {
             ),
             const SizedBox(height: 8),
             Text(widget.observation,
-                style:
-                    const TextStyle(color: Colors.white70, fontSize: 13)),
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
             if (_expanded) ...[
               const SizedBox(height: 12),
               const Divider(color: Colors.white12),
               const SizedBox(height: 8),
-              const Text('적용 방법',
-                  style: TextStyle(
-                      color: Color(0xFFE8D5B7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text(widget.application,
-                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+
+              // application — 메인 설명 (4요소 통합)
+              Text(
+                widget.application,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 13, height: 1.6),
+              ),
+
               if (widget.references.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 const Text('레퍼런스',
                     style: TextStyle(
                         color: Color(0xFFE8D5B7),
                         fontSize: 12,
                         fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 ...widget.references.map((ref) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.person_outline,
-                              color: Colors.white38, size: 14),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${ref['name']} — ${ref['description']}',
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12),
+                          Row(children: [
+                            const Icon(Icons.person_outline,
+                                color: Color(0xFFE8D5B7), size: 13),
+                            const SizedBox(width: 5),
+                            Text(ref['name']?.toString() ?? '',
+                                style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                          ]),
+                          if ((ref['context']?.toString() ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 18, top: 2),
+                              child: Text(ref['context'].toString(),
+                                  style: const TextStyle(
+                                      color: Colors.white38, fontSize: 11)),
                             ),
-                          ),
+                          if ((ref['description']?.toString() ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 18, top: 2),
+                              child: Text(ref['description'].toString(),
+                                  style: const TextStyle(
+                                      color: Colors.white54, fontSize: 11,
+                                      fontStyle: FontStyle.italic)),
+                            ),
                         ],
                       ),
                     )),

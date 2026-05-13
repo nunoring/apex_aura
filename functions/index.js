@@ -31,46 +31,40 @@ const ANIMAL_CATALOG = [
 const CATALOG_NAMES = ANIMAL_CATALOG.map(a => a.name).join(", ");
 
 // ─── GPT 시스템 프롬프트 ─────────────────────────────────────
-const SYSTEM_PROMPT = `당신은 전문 패션 & 스타일 컨설턴트입니다.
-사진 속 인물의 현재 헤어스타일, 패션, 그루밍 상태를 보고 스타일링 개선 솔루션을 제공합니다.
+const SYSTEM_PROMPT = `당신은 10년 경력의 전문 이미지 컨설턴트입니다.
+사진을 보고 이 사람만의 특징을 관찰하여 스타일링 솔루션을 제공합니다.
 
-## 분석 철학
-- 외관의 개성과 매력을 중심으로 분석
-- 스타일링(헤어/메이크업/패션)으로 개선 가능한 영역에 집중
-- 피지컬 × 얼굴 × 패션 3박자 조화로 한계치를 넘어서는 접근
+## 핵심 원칙: 개인 관찰 의무 (INDIVIDUAL_OBSERVATION_RULE)
+모든 진단은 반드시 "이 사진에서 보이는 ___" 또는 "현재 ___ 부분이" 같은 구체적 관찰로 시작합니다.
 
-## 스타일 완성도 평가 기준
-- 스타일링 완성도, 헤어, 피부 관리 상태, 전체적인 인상을 종합 평가
-- 숫자 점수는 스타일링 개선 가능성을 나타내는 지표로 사용
+❌ 금지: "레이어드컷은 윤곽을 강조하는 효과가 있어요"
+✅ 필수: "현재 머리카락이 광대 라인을 살짝 가리는 길이인데, 이게 둥근 얼굴형을 더 둥글어 보이게 해요. 레이어드컷으로 옆선을 드러내면 윤곽이 살아나요"
 
-## 그루밍 방향성 키워드 (6개 조합)
-분석 대상의 나이/체형/얼굴형을 고려하여 아래 중 가장 어울리는 6개 선택:
-생기있는, 동안, 활동적인, 외향적인, 유머러스한, 캐주얼,
-세련된, 차분한, 지적인, 강인한, 부드러운, 신뢰감있는
+## 메커니즘 4요소 강제 (MECHANISM_4ELEMENT_RULE)
+각 액션 카드/추천에 반드시 4요소 포함:
+1. 관찰: 현재 사진에서 보이는 구체적 사실
+2. 영향: 그게 인상에 어떤 작용을 하는지
+3. 변화: 어떻게 다르게 만드는지 (구체적 방법)
+4. 결과: 변화 후 어떤 인상이 나오는지
 
-## 메이크업 4단계 구조 (남성 기준)
-1단계 기초: 수분 토너패드 → 스킨(토너) → 세럼 → 수분 메이크업 베이스
-  - 묽은 제형 → 무거운 제형 순서, 피부 결 따라 세로로 흡수
-2단계 베이스: 파운데이션 → 컨실러 → 파우더/픽서
-3단계 음영: 눈썹 → 쉐딩 → 립 → 하이라이트
-4단계 마무리: 파우더 → 메이크업 픽서
+## 금지 어휘 (GENERIC_VOCABULARY_BAN)
+단독 사용 절대 금지 — 반드시 구체적 메커니즘과 함께:
+- "세련된" / "정돈된" / "조화로운" → 구체적 설명 후에만 사용
+- "~한 인상을 만들어요" → 4요소로 풀어서
+- "변화에 효과적이에요" → 메커니즘 설명으로 대체
 
-## 패션 방향성
-- 체형 보완 중심: 어깨 넓어보이는 상의, 하견 보완
-- 하의: 세미와이드~원턱 와이드 팬츠 권장 (조거팬츠/슬림핏 비권장)
-- 색상: 회색/검정/네이비/흰색 중심, 대비감 적절히 조절
+## 톤 변화 의무 (TONE_VARIATION_RULE)
+모든 문장이 "~어요"로만 끝나면 안 됩니다.
+각 액션 카드에 아래 강조 어휘 최소 1개 포함:
+- "핵심은 ___예요", "사실 이게 가장 중요한데요", "여기서 바뀌는 게 ___"
+- "근데", "사실", "충분히 가능해요", "잘 어울려요"
 
-## 카피 톤 규칙
-- 호칭 없음 (2인칭 생략)
-- 종결어미: ~어요 / ~거든요 / ~예요
-- 강조 표현: "포인트는", "핵심은", "여기서 바뀌는 게", "효율적인"
-- 금지 표현: ~습니다, ~추천합니다, ~가능합니다, ~개선됩니다, ~이 분의 경우
+## 셀럽 레퍼런스 구체화 (CELEB_REFERENCE_RULE)
+셀럽 이름만 있으면 자동생성 티입니다. 반드시:
+- 셀럽명 + 작품/시기(구체적) + 그 장면의 특정 스타일 포함
 
-## 표현 순화 기준
-"하안부가 긴 편" → "하안부가 표준보다 길어서 갸름한 인상을 줘요"
-"둔해보이는 느낌" → "현재 스타일이 눈매의 날카로움을 가리고 있어요"
-"시선을 끄는 외관" → 긍정적 방향으로 재해석
-"첫인상에서 매력적으로 보이는" 방향으로 서술
+❌ 금지: "한지민의 미디엄 레이어드"
+✅ 필수: "한지민 '나의 해방일지' 초반부 출근 장면 헤어 — 옆머리가 귀 아래로 자연스럽게 흘러내리면서 얼굴 옆선을 살짝 드러내는 스타일"
 
 ## 동물상 카탈로그 (반드시 이 7종에서만 선택)
 강아지상 🐶 — 부드러움, 친근함, 자연스러움
@@ -86,12 +80,26 @@ const SYSTEM_PROMPT = `당신은 전문 패션 & 스타일 컨설턴트입니다
 - sub_animal: 두 번째로 느껴지는 1종
 - target_animal: 스타일링으로 도달 가능한 목표 1종
 - 셋은 반드시 서로 다른 동물상이어야 함
-- keywords는 해당 카탈로그의 것만 사용 (창작 금지)
+
+## 메이크업 4단계 구조 (남성 기준)
+1단계 기초: 수분 토너패드 → 스킨 → 세럼 → 메이크업 베이스
+2단계 베이스: 파운데이션 → 컨실러 → 파우더
+3단계 음영: 눈썹 → 쉐딩 → 립 → 하이라이트
+4단계 마무리: 파우더 → 픽서
+
+## 패션 방향성
+- 체형 보완 중심, 세미와이드~원턱 와이드 팬츠 권장
+- 색상: 회색/검정/네이비/흰색 중심
+
+## 카피 톤
+- 호칭 없음 (2인칭 생략)
+- 종결어미: ~어요 / ~거든요 / ~예요 (혼합)
+- 절대 금지: ~습니다, ~추천합니다, ~가능합니다
 
 ## 절대 금지
-- 시술/성형/의료 언급 (필러, 보톡스, 수술, 레이저, 주사 등 일체)
-- 신체 비하 표현 (못생긴, 결함, 흠, 단점 등)
-- 의사/처방/치료 관련 언급`;
+- 시술/성형/의료 언급 (필러, 보톡스, 수술, 레이저 등)
+- 신체 비하 (못생긴, 결함, 흠, 단점 등)
+- 이 사람 사진에 없는 것을 있다고 관찰하는 것`;
 
 // ─── Free 응답 스키마 지시 ────────────────────────────────────
 const FREE_SCHEMA_INSTRUCTION = `
@@ -148,27 +156,30 @@ const FREE_SCHEMA_INSTRUCTION = `
   "action_cards": [
     {
       "category": "헤어스타일",
-      "observation": "현재 상태 관찰 (카피 톤 적용)",
-      "application": "구체적 적용 방법",
-      "references": [
-        {
-          "name": "연예인/인플루언서 이름",
-          "context": "시기/상황",
-          "description": "어떤 스타일인지"
-        }
-      ]
+      "observation": "현재 사진에서 보이는 헤어 상태 — 길이/볼륨/앞머리 위치 등 구체적 묘사 (40자 이상)",
+      "impact": "그 헤어가 이 사람 얼굴형/인상에 미치는 영향 (30자 이상)",
+      "change": "어떻게 바꾸면 되는지 구체적 방법 (30자 이상)",
+      "result": "바꾼 후 어떤 인상이 나오는지 (30자 이상)",
+      "application": "observation+impact+change+result를 자연스럽게 연결한 전체 설명 (카피 톤, 100자 이상, 강조 어휘 최소 1개)",
+      "references": [{"name": "셀럽명", "context": "작품명+시기+구체적 장면 (30자 이상)", "description": "어떤 스타일 요소 참고 (20자 이상)"}]
     },
     {
       "category": "패션",
-      "observation": "...",
-      "application": "...",
-      "references": []
+      "observation": "현재 사진에서 보이는 체형/스타일 상태 (40자 이상)",
+      "impact": "그게 인상/체형에 미치는 영향 (30자 이상)",
+      "change": "구체적 변화 방법 (30자 이상)",
+      "result": "변화 후 인상 (30자 이상)",
+      "application": "자연스럽게 연결한 전체 설명 (카피 톤, 100자 이상, 강조 어휘 최소 1개)",
+      "references": [{"name": "...", "context": "작품+시기+장면 (30자 이상)", "description": "..."}]
     },
     {
       "category": "메이크업",
-      "observation": "...",
-      "application": "...",
-      "references": []
+      "observation": "현재 피부/눈썹/전체 그루밍 상태 (40자 이상)",
+      "impact": "그게 인상에 미치는 영향 (30자 이상)",
+      "change": "구체적 변화 방법 (30자 이상)",
+      "result": "변화 후 인상 (30자 이상)",
+      "application": "자연스럽게 연결한 전체 설명 (카피 톤, 100자 이상, 강조 어휘 최소 1개)",
+      "references": [{"name": "...", "context": "작품+시기+장면 (30자 이상)", "description": "..."}]
     }
   ]
 }
@@ -262,12 +273,31 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
   "action_cards": [
     {
       "category": "헤어스타일",
-      "observation": "현재 헤어 상태 관찰 (30자 이상)",
-      "application": "구체적 적용 방법 (30자 이상)",
-      "references": [{"name": "셀럽 이름", "context": "시기/작품", "description": "어떤 스타일"}]
+      "observation": "현재 사진에서 보이는 헤어 상태 — 길이/볼륨/앞머리 위치 등 구체적 묘사 (40자 이상)",
+      "impact": "그 헤어가 이 사람 얼굴형/인상에 미치는 영향 (30자 이상)",
+      "change": "어떻게 바꾸면 되는지 구체적 방법 (30자 이상)",
+      "result": "바꾼 후 어떤 인상이 나오는지 (30자 이상)",
+      "application": "observation+impact+change+result를 자연스럽게 연결한 전체 설명 (카피 톤, 100자 이상, 강조 어휘 최소 1개)",
+      "references": [{"name": "셀럽명", "context": "작품명+시기+구체적 장면 (30자 이상)", "description": "어떤 스타일 요소 참고 (20자 이상)"}]
     },
-    {"category": "패션", "observation": "30자 이상", "application": "30자 이상", "references": [{"name": "...", "context": "...", "description": "..."}]},
-    {"category": "메이크업", "observation": "30자 이상", "application": "30자 이상", "references": [{"name": "...", "context": "...", "description": "..."}]}
+    {
+      "category": "패션",
+      "observation": "현재 사진에서 보이는 체형/스타일 상태 (40자 이상)",
+      "impact": "그게 인상/체형에 미치는 영향 (30자 이상)",
+      "change": "구체적 변화 방법 (30자 이상)",
+      "result": "변화 후 인상 (30자 이상)",
+      "application": "자연스럽게 연결한 전체 설명 (카피 톤, 100자 이상, 강조 어휘 최소 1개)",
+      "references": [{"name": "...", "context": "작품+시기+장면 (30자 이상)", "description": "..."}]
+    },
+    {
+      "category": "메이크업",
+      "observation": "현재 피부/눈썹/전체 그루밍 상태 (40자 이상)",
+      "impact": "그게 인상에 미치는 영향 (30자 이상)",
+      "change": "구체적 변화 방법 (30자 이상)",
+      "result": "변화 후 인상 (30자 이상)",
+      "application": "자연스럽게 연결한 전체 설명 (카피 톤, 100자 이상, 강조 어휘 최소 1개)",
+      "references": [{"name": "...", "context": "작품+시기+장면 (30자 이상)", "description": "..."}]
+    }
   ],
   "makeup_steps": [
     {
@@ -355,6 +385,56 @@ radar 값은 0.0~1.0 범위. animal_match.percentage는 60~95 정수.
 makeup_steps는 반드시 4개, fashion_looks는 반드시 2개여야 합니다.`;
 
 // ─── 응답 검증 ────────────────────────────────────────────────
+// ─── AI 티 검출기 ─────────────────────────────────────────────
+function detectAITone(result) {
+  const issues = [];
+  const text = JSON.stringify(result);
+
+  // 1. 금지 일반론 패턴
+  const genericPatterns = [
+    /[^\n]{0,10}은 [^\n]{0,20}를? 강조하는 효과가 있어요/,
+    /[^\n]{0,10}으로 [^\n]{0,10}한 인상을 만들어요/,
+    /[^\n]{0,10}에 효과적이에요/,
+  ];
+  for (const pattern of genericPatterns) {
+    if (pattern.test(text)) issues.push(`일반론 패턴: ${pattern}`);
+  }
+
+  // 2. 금지 어휘 단독 사용
+  const bannedSolo = ['"세련된 인상"', '"정돈된 인상"', '"조화로운 느낌"', '"효율적인 변화"'];
+  for (const word of bannedSolo) {
+    if (text.includes(word)) issues.push(`금지 어휘: ${word}`);
+  }
+
+  // 3. 셀럽 레퍼런스 context 길이
+  const actionCards = result.action_cards || [];
+  for (const card of actionCards) {
+    for (const ref of (card.references || [])) {
+      if ((ref.context || '').length < 20) {
+        issues.push(`셀럽 context 부족: ${ref.name}`);
+      }
+    }
+  }
+
+  // 4. application 강조 어휘 확인
+  const emphasisWords = ['핵심은', '사실 이게', '여기서 바뀌는', '근데', '충분히', '사실'];
+  for (const card of actionCards) {
+    const app = card.application || '';
+    if (app.length > 0 && !emphasisWords.some(w => app.includes(w))) {
+      issues.push(`강조 어휘 없음: ${card.category}`);
+    }
+  }
+
+  // 5. application 길이 (100자 미만)
+  for (const card of actionCards) {
+    if (card.application && card.application.length < 80) {
+      issues.push(`application 너무 짧음: ${card.category} (${card.application.length}자)`);
+    }
+  }
+
+  return issues;
+}
+
 function validateAnimalMatch(result) {
   try {
     const am = result.first_impression?.animal_match;
@@ -546,6 +626,29 @@ exports.analyzeImage = onRequest(
           if (containsBanned(JSON.stringify(result)) || !validator(result)) {
             console.log("2차 재시도 실패 — 폴백 사용");
             result = getFallbackResponse(isPro);
+          }
+        }
+
+        // AI 티 검출 — 문제 있으면 1회 재시도
+        const aiToneIssues = detectAITone(result);
+        if (aiToneIssues.length > 0) {
+          console.log('AI 티 검출:', aiToneIssues.slice(0, 3));
+          const feedbackPrompt = userPrompt + `
+
+[품질 피드백] 이전 응답에서 다음 문제가 발생했습니다:
+${aiToneIssues.slice(0, 5).map((issue, i) => `${i + 1}. ${issue}`).join('\n')}
+
+수정 지침:
+- 모든 진단은 "현재 사진에서 보이는 ___"로 시작
+- application 각 100자 이상, 강조 어휘(핵심은/사실/근데/여기서 바뀌는) 최소 1개
+- 셀럽 references의 context는 작품명+시기+장면 모두 포함`;
+          try {
+            const refined = await callGPT(openai, feedbackPrompt, imgData, mimeType);
+            if (validator(refined) && !containsBanned(JSON.stringify(refined))) {
+              result = refined;
+            }
+          } catch (e) {
+            console.log('AI 티 재시도 실패 — 기존 결과 사용');
           }
         }
 
