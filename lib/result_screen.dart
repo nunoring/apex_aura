@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' as dart_ui;
+import 'package:gal/gal.dart';
 import 'subscription_service.dart';
 import 'paywall_screen.dart';
 import 'services/pdf_service.dart';
@@ -745,6 +747,19 @@ class _ResultScreenState extends State<ResultScreen> {
 
           const SizedBox(height: 24),
           ElevatedButton.icon(
+            onPressed: _isSharing ? null : _saveLongImage,
+            icon: const Icon(Icons.photo_library_outlined, size: 18),
+            label: const Text('현재 화면 갤러리 저장'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E1E1E),
+              foregroundColor: const Color(0xFFE8D5B7),
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
             onPressed: () => PdfService.generateAndOpen(analysisResult),
             icon: const Icon(Icons.download, size: 18),
             label: const Text('전체 분석 PDF 저장'),
@@ -790,6 +805,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Widget _buildAffiliateDisclaimer() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
@@ -1585,84 +1601,8 @@ class _ResultScreenState extends State<ResultScreen> {
           ),
           const SizedBox(height: 10),
 
-          // 현재 → 목표 비교 바 (compact, 사진 아래)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF111111),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
-            ),
-            child: Row(
-              children: [
-                // 현재
-                Text(info?.emoji ?? '', style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 6),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(currentType,
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700,
-                            color: Color(0xFFE8D5B7))),
-                    const Text('현재',
-                        style: TextStyle(fontSize: 9, color: Color(0xFF555555))),
-                  ],
-                ),
-                const Spacer(),
-                // 갭 인디케이터
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: List.generate(5, (i) => Container(
-                        margin: const EdgeInsets.only(right: 3),
-                        width: 18, height: 4,
-                        decoration: BoxDecoration(
-                          color: i < difficulty ? diffColor : const Color(0xFF222222),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      )),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      isSameType ? '동일' : diffLabel,
-                      style: TextStyle(fontSize: 8, color: diffColor),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                // 목표
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(animalType,
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700,
-                            color: Color(0xFFE8A030))),
-                    const Text('목표',
-                        style: TextStyle(fontSize: 9, color: Color(0xFF555555))),
-                  ],
-                ),
-                const SizedBox(width: 6),
-                // 목표 동물상 참조 이미지 (작은 썸네일)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/images/${_animalImgKey(animalType)}_${widget.gender}.png',
-                    width: 40, height: 40,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Text(
-                        targetInfo?.emoji ?? '',
-                        style: const TextStyle(fontSize: 28)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          // 비교 카드 → Page 2(동물상 매칭)로 이동됨
 
           // 첫인상 분석 카드 — 현재→목표 중복 표시 제거, 인상 내용에 집중
           Container(
@@ -2772,6 +2712,45 @@ class _ResultScreenState extends State<ResultScreen> {
               '내 얼굴 AI 분석하기 👇\n'
               'https://play.google.com/store/apps/details?id=com.vacman.apex_aura',
       );
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
+  }
+
+  // 긴 이미지 저장 — 현재 페이지 캡처 후 갤러리 저장
+  Future<void> _saveLongImage() async {
+    if (_isSharing) return;
+    setState(() => _isSharing = true);
+    try {
+      final boundary = _shareKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        // shareKey 없으면 현재 페이지 전체를 screenshot으로 캡처
+        final image = await _screenshotController.captureFromWidget(
+          _buildShareCard(), pixelRatio: 3.0, context: context);
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/apex_aura_long.png');
+        await file.writeAsBytes(image);
+        await Gal.putImage(file.path, album: 'Apex Aura');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('갤러리에 저장됐어요'), duration: Duration(seconds: 2)));
+        }
+        return;
+      }
+      final img = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await img.toByteData(format: dart_ui.ImageByteFormat.png);
+      if (byteData == null) return;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/apex_aura_long.png');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+      await Gal.putImage(file.path, album: 'Apex Aura');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('갤러리에 저장됐어요'), duration: Duration(seconds: 2)));
+      }
+    } catch (e) {
+      debugPrint('saveLongImage error: $e');
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }

@@ -8,7 +8,11 @@ import 'subscription_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    // Firebase 초기화 실패 시에도 앱 동작 유지
+  }
   await SubscriptionService.init();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const MyApp());

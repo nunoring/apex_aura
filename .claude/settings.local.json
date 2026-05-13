@@ -49,7 +49,23 @@
       "mcp__claude_ai_Notion__notion-search",
       "mcp__claude_ai_Notion__notion-fetch",
       "mcp__claude_ai_Notion__notion-update-page",
-      "mcp__claude_ai_Notion__notion-create-pages"
+      "mcp__claude_ai_Notion__notion-create-pages",
+      "Bash(git stash *)",
+      "Bash(git filter-branch *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(Test-Path \"android\\\\app\\\\upload-keystore.jks\")",
+      "Bash(adb -s R3CX4039H1W install -r \"build\\\\app\\\\outputs\\\\flutter-apk\\\\app-release.apk\")",
+      "Bash(flutter install *)",
+      "Bash(node -e \"require\\('./index.js'\\)\")",
+      "Bash(npm install *)",
+      "Bash(firebase functions:log --only analyzeImage)",
+      "Bash(node -e \"const { OpenAI } = require\\('openai'\\); console.log\\(typeof OpenAI\\);\")",
+      "Bash(Select-String -Pattern \"error:|Error\")",
+      "Bash(Get-Content \"C:\\\\Users\\\\vacma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-vacma-Desktop-apps-apex-aura\\\\78229015-e224-4a60-b7f5-3b6f73701fa4\\\\tasks\\\\blzuw8c12.output\")",
+      "Bash(Select-String \"error:|Built \")",
+      "Bash(Select-Object -Last 5)"
     ]
   }
 }

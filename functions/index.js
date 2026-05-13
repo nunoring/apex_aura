@@ -445,9 +445,8 @@ exports.analyzeImage = onRequest(
           faceData,
         } = req.body;
 
-        const imgData = base64Image || imageBase64;
-        if (!imgData) {
-          return res.status(400).json({ error: "imageBase64 required" });
+        if (!faceData) {
+          return res.status(400).json({ error: "faceData required" });
         }
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -455,12 +454,12 @@ exports.analyzeImage = onRequest(
 
         const userPrompt = buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction);
 
-        // 1차 시도
+        // 1차 시도 (텍스트 전용 — 이미지 거부 문제 근본 해결)
         let result;
         try {
-          result = await callGPT(openai, userPrompt, imgData, mimeType);
+          result = await callGPT(openai, userPrompt);
         } catch (gptErr) {
-          console.log("GPT 거부 또는 파싱 실패 — 폴백 사용:", gptErr.message);
+          console.log("GPT 실패 — 폴백 사용:", gptErr.message);
           result = getFallbackResponse(isPro);
           return res.status(200).json({ ...result, skinAnalysis: result.scores || {} });
         }
@@ -478,7 +477,7 @@ exports.analyzeImage = onRequest(
             (!isValid && isPro ? "\n\n[중요] makeup_steps 4개, fashion_looks 2개, consultant_report_full 5개 필드 모두 채워주세요." : "");
 
           try {
-            result = await callGPT(openai, retryPrompt, imgData, mimeType);
+            result = await callGPT(openai, retryPrompt);
           } catch (e) {
             result = getFallbackResponse(isPro);
           }
@@ -505,49 +504,58 @@ exports.analyzeImage = onRequest(
 // ─── 유저 프롬프트 생성 ────────────────────────────────────────
 function buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction) {
   const genderKo = gender === "female" ? "여성" : "남성";
-  const faceMetrics = faceData
-    ? `\nML Kit 수치: 눈꼬리 ${faceData.eye_angle}° (${faceData.eye_angle_desc}), 얼굴형 ${faceData.face_shape}, 눈간격 ${faceData.eye_gap_desc}, 황금비율 ${faceData.golden_desc}`
-    : "";
 
-  return `첨부된 사진 속 인물의 현재 스타일을 분석하고 개선 방향을 제안해주세요.
+  const eyeAngle = faceData?.eye_angle ?? 0;
+  const eyeAngleDesc = faceData?.eye_angle_desc ?? "수평";
+  const faceShape = faceData?.face_shape ?? "계란형";
+  const faceRatio = faceData?.face_ratio ?? 0.75;
+  const eyeGapDesc = faceData?.eye_gap_desc ?? "보통";
+  const goldenDesc = faceData?.golden_desc ?? "보통";
+  const noseDesc = faceData?.nose_desc ?? "보통";
+  const currentFaceType = faceData?.current_face_type ?? "미분류";
+  const symmetryScore = faceData?.symmetry_score ?? 80;
 
-분석 대상: ${genderKo}${animalType ? `, 목표 스타일: ${animalType}` : ""}${faceMetrics}
+  return `아래 얼굴 수치 데이터를 바탕으로 ${genderKo}의 스타일링 컨설팅을 제공해주세요.
 
-분석 항목:
-- 현재 헤어스타일 상태 및 개선 방향
-- 피부 관리 상태
-- 그루밍 완성도
-- 패션/스타일링 방향성
-${isPro ? `- 얼굴 비율 (상/중/하안부 %), 가로세로 비율
-- 외모 점수 (6.0~8.0 범위)
-- 메이크업 4단계 제품 추천
-- 패션 룩 2벌 추천
-- 어울리는 컬러 팔레트` : ""}
+## 측정 데이터 (AI 측정값)
+- 현재 동물상: ${currentFaceType}
+- 목표 동물상: ${animalType || "여우상"}
+- 성별: ${genderKo}
+- 눈꼬리 각도: ${eyeAngle}° (${eyeAngleDesc})
+- 얼굴형: ${faceShape} (가로세로 비율: ${faceRatio})
+- 눈 간격: ${eyeGapDesc}
+- 황금비율: ${goldenDesc}
+- 코 특징: ${noseDesc}
+- 대칭도: ${symmetryScore}/100
+
+## 분석 방향
+이 수치를 바탕으로:
+1. 현재 동물상(${currentFaceType})의 특징적 매력 분석
+2. 목표(${animalType || "여우상"})까지의 갭 분석
+3. 헤어/메이크업/패션으로 접근 가능한 변화 방향 제시
+${isPro ? `4. 얼굴 비율 진단 (수치 기반으로 추정)
+5. 스타일링 완성도 점수 (6.0~8.0)
+6. 메이크업 4단계 구체 제품 추천
+7. 패션 룩 2벌 제안` : ""}
+
+## 동물상 분류 기준 (ANIMAL_CATALOG)
+${ANIMAL_CATALOG.map(a => `${a.name} ${a.emoji} — ${a.keywords.join(", ")}`).join("\n")}
+- main_animal은 현재 동물상(${currentFaceType})으로 설정
+- target_animal은 목표(${animalType || "여우상"})로 설정
+- sub_animal은 나머지 중 가장 유사한 것으로 선택
 
 ${schemaInstruction}`;
 }
 
 // ─── GPT 호출 헬퍼 ────────────────────────────────────────────
-async function callGPT(openai, userPrompt, imageBase64, mimeType) {
+async function callGPT(openai, userPrompt) {
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
-    max_tokens: 4000,
-    temperature: 0.7,
+    max_tokens: 4500,
+    temperature: 0.5,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:${mimeType};base64,${imageBase64}`,
-              detail: "auto",
-            },
-          },
-          { type: "text", text: userPrompt },
-        ],
-      },
+      { role: "user", content: userPrompt },
     ],
   });
 
