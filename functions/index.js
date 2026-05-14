@@ -707,24 +707,17 @@ function buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction)
   const currentFaceType = faceData?.current_face_type ?? "미분류";
   const symmetryScore = faceData?.symmetry_score ?? 80;
 
-  return `아래 얼굴 수치 데이터를 바탕으로 ${genderKo}의 스타일링 컨설팅을 제공해주세요.
+  return `사진 속 인물의 헤어스타일, 그루밍, 패션 스타일을 분석하고 개선 방향을 제시해주세요.
 
-## 측정 데이터 (AI 측정값)
-- 현재 동물상: ${currentFaceType}
-- 목표 동물상: ${animalType || "여우상"}
+## 분석 참고 데이터
+- 목표 스타일: ${animalType || "여우상"} 계열
 - 성별: ${genderKo}
-- 눈꼬리 각도: ${eyeAngle}° (${eyeAngleDesc})
-- 얼굴형: ${faceShape} (가로세로 비율: ${faceRatio})
-- 눈 간격: ${eyeGapDesc}
-- 황금비율: ${goldenDesc}
-- 코 특징: ${noseDesc}
-- 대칭도: ${symmetryScore}/100
+- 눈꼬리 각도: ${eyeAngle}° (${eyeAngleDesc}), 얼굴형: ${faceShape}, 눈간격: ${eyeGapDesc}
 
 ## 분석 방향
-이 수치를 바탕으로:
-1. 현재 동물상(${currentFaceType})의 특징적 매력 분석
-2. 목표(${animalType || "여우상"})까지의 갭 분석
-3. 헤어/메이크업/패션으로 접근 가능한 변화 방향 제시
+1. 헤어/그루밍 현재 상태와 개선 방향
+2. 패션 스타일링 방향
+3. 목표 스타일까지의 변화 포인트
 ${isPro ? `4. 얼굴 비율 진단 (수치 기반으로 추정)
 5. 스타일링 완성도 점수 (6.0~8.0)
 6. 메이크업 4단계 구체 제품 추천

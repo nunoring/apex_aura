@@ -175,6 +175,12 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
+  String _emojiForAnimal(String name) {
+    const map = {'강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊', '곰상': '🐻', '토끼상': '🐰', '사슴상': '🦌', '늑대상': '🐺'};
+    for (final e in map.entries) { if (name.contains(e.key.replaceAll('상', ''))) return e.value; }
+    return '✨';
+  }
+
   Widget _ratioItem(String label, String value) {
     return Column(
       children: [
@@ -188,7 +194,25 @@ class _ResultScreenState extends State<ResultScreen> {
   // ─── Pro Page 2: 동물상 매칭 ─────────────────────────────────────
   Widget _buildPage2Pro() {
     final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
-    final mainA = fi?['main_animal'] as Map<String, dynamic>?;
+    final animalMatchData = fi?['animal_match'] as Map<String, dynamic>?;
+
+    // main_animal이 없으면 animal_match.main으로 합성
+    var mainA = fi?['main_animal'] as Map<String, dynamic>?;
+    if (mainA == null && animalMatchData != null) {
+      final mainName = animalMatchData['main']?.toString() ?? '강아지상';
+      mainA = {
+        'name': mainName,
+        'emoji': _emojiForAnimal(mainName),
+        'keywords': ['부드러움', '친근함', '자연스러움'],
+        'strengths': (animalMatchData['similarity_points'] as List? ?? [])
+            .take(3)
+            .map((s) => {'title': '닮은 점', 'description': s.toString()})
+            .toList(),
+        'tip': animalMatchData['reasons']?.isNotEmpty == true
+            ? (animalMatchData['reasons'] as List).first.toString()
+            : '매력을 살리는 방향으로 스타일링하세요.',
+      };
+    }
     final subA = fi?['sub_animal'] as Map<String, dynamic>?;
     final targetA = fi?['target_animal'] as Map<String, dynamic>?;
 
