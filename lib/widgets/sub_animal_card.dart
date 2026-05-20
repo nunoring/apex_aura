@@ -5,6 +5,7 @@ class SubAnimalCard extends StatelessWidget {
   final String emoji;
   final List<String> keywords;
   final String comment;
+  final String? imagePath;
 
   static const _gold = Color(0xFFE8D5B7);
 
@@ -14,6 +15,7 @@ class SubAnimalCard extends StatelessWidget {
     required this.emoji,
     required this.keywords,
     required this.comment,
+    this.imagePath,
   });
 
   @override
@@ -33,8 +35,19 @@ class SubAnimalCard extends StatelessWidget {
                   color: Color(0xFF888877), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
           const SizedBox(height: 10),
           Row(children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
+            if (imagePath != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  imagePath!,
+                  width: 36, height: 36, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Text(emoji, style: const TextStyle(fontSize: 22)),
+                ),
+              )
+            else
+              Text(emoji, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 10),
             Text(name,
                 style: const TextStyle(
                     color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),

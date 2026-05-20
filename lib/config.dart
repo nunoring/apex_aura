@@ -11,3 +11,4 @@ const kAnalyzeImageUrl = 'https://analyzeimage-4dnwp3bpzq-uc.a.run.app';
 
 // Developer mode — set true to bypass paywall during testing
 const kDevMode = true;
+const kGeminiApiKey = 'AIzaSyDOrG5JLATTHG0mXJntSMnvkjgsZFMzbsw';

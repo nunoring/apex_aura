@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'config.dart';
+import 'services/gemini_service.dart';
 import 'result_screen.dart';
 import 'face_detector_service.dart';
 import 'face_selection_screen.dart';
@@ -335,124 +335,220 @@ class _LoadingScreenState extends State<LoadingScreen>
     int retryCount = 0,
     String? extraInstruction,
   }) async {
-    final response = await _callFirebase(faceData, extraInstruction: extraInstruction);
-    final responseText = jsonEncode(response);
-    final hasBanned = _bannedWords.any((w) => responseText.contains(w));
-    if (!hasBanned && _isValidResponse(response)) return response;
-    if (retryCount >= 2) return _buildFallbackResponse();
-    return _getAnalysisWithRetry(
-      faceData,
-      retryCount: retryCount + 1,
-      extraInstruction: hasBanned
-          ? '이전 응답에 금지 단어가 포함됐어요. 시술/의료 관련 표현을 헤어, 메이크업, 패션 관련 표현으로 대체해서 다시 응답해줘.'
-          : '이전 응답이 필수 형식을 충족하지 않았어요. JSON 구조와 최소 글자 수를 지켜서 다시 응답해줘.',
-    );
+    try {
+      final imageBytes = await widget.primaryImage.readAsBytes();
+      final result = await GeminiService.analyze(
+        imageBytes: imageBytes,
+        mimeType: 'image/jpeg',
+        animalType: widget.animalType,
+        gender: widget.gender,
+        faceData: faceData,
+        isPro: widget.isPro,
+      );
+      final hasBanned = _bannedWords.any((w) => jsonEncode(result).contains(w));
+      if (hasBanned) return _buildFallbackResponse();
+      return result;
+    } catch (e, st) {
+      debugPrint('🔴 GeminiService 에러: $e\n$st');
+      return _buildFallbackResponse();
+    }
+  }
+
+  static String _animalEmoji(String name) {
+    const map = {
+      '강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊',
+      '사슴상': '🦌', '늑대상': '🐺', '토끼상': '🐰', '곰상': '🐻',
+    };
+    return map[name] ?? '✨';
   }
 
   Map<String, dynamic> _buildFallbackResponse() {
+    final targetAnimal = widget.animalType;
+    final targetEmoji = _animalEmoji(targetAnimal);
+    const currentAnimal = '강아지상';
+    const currentEmoji = '🐶';
+    final genderLabel = widget.gender == 'female' ? '메이크업' : '그루밍';
     return {
+      "first_impression": {
+        "summary": "자연스럽고 친근한 인상이에요. 스타일링으로 충분히 달라질 수 있어요.",
+        "face_shape": "계란형",
+        "main_animal": {
+          "name": currentAnimal,
+          "emoji": currentEmoji,
+          "keywords": ["부드러움", "친근함", "자연스러움"],
+          "strengths": [
+            {"title": "부드러운 인상", "description": "처음 본 사람도 편안하게 느끼는 매력이 있어요."},
+            {"title": "친근한 분위기", "description": "쉽게 다가갈 수 있는 따뜻한 매력을 가지고 있어요."},
+            {"title": "자연스러운 표정", "description": "꾸미지 않아도 매력적인 표정을 가지고 있어요."},
+          ],
+          "tip": "이 매력은 그대로 살리고 헤어와 스타일링을 더하는 방향이 효율적이에요.",
+        },
+        "sub_animal": {
+          "name": "고양이상",
+          "emoji": "🐱",
+          "keywords": ["도도함", "신비로움"],
+          "comment": "이 매력도 함께 가지고 있어요. 활용하면 입체적 인상이 나와요.",
+        },
+        "target_animal": {
+          "name": targetAnimal,
+          "emoji": targetEmoji,
+          "keywords": ["세련됨", "정돈됨"],
+          "comment": "스타일링으로 충분히 도달 가능한 목표예요.",
+        },
+        "animal_match": {
+          "main": currentAnimal,
+          "percentage": 82,
+          "similarity_points": [
+            "부드러운 눈매 라인이 친근하고 따뜻한 첫인상을 자연스럽게 만들어줘요.",
+            "얼굴 전체 윤곽의 곡선감이 무해하고 편안한 느낌과 맞닿아 있어요.",
+            "처음 보는 사람에게도 경계심 없이 다가갈 수 있는 인상 구조예요.",
+          ],
+        },
+      },
       "comparison": {
-        "current_animal": "분석 중",
+        "current_animal": currentAnimal,
         "target_animal": widget.animalType,
-        "current_keywords": ["자연스러움", "친근함", "부드러움"],
+        "current_keywords": ["부드러움", "친근함", "자연스러움"],
         "target_keywords": ["세련됨", "정돈됨", "또렷함"],
-        "gap_percent": 50
+        "gap_percent": 45,
       },
       "radar": {
-        "current": {"눈매": 0.5, "코": 0.5, "얼굴윤곽": 0.5, "스타일": 0.4},
-        "target": {"눈매": 0.8, "코": 0.7, "얼굴윤곽": 0.8, "스타일": 0.85}
+        "current": {"눈매": 0.5, "코": 0.5, "얼굴윤곽": 0.55, "스타일": 0.4},
+        "target": {"눈매": 0.85, "코": 0.7, "얼굴윤곽": 0.75, "스타일": 0.85},
       },
-      "consultant_report": {
-        "quote": "더 세련된 스타일로 변화할 수 있는 포인트들이 있어요.",
-        "observation": "전반적으로 자연스럽고 친근한 인상이에요. 눈매와 헤어 스타일링에서 변화 포인트를 찾을 수 있어요.",
-        "impact": "부드럽고 편안한 느낌을 줘요.",
-        "gap": "눈매와 스타일링 완성도에서 차이가 있어요.",
-        "direction": "눈 연출과 헤어 스타일링이 핵심이에요."
+      "consultant_report_simple": {
+        "quote": "핵심은 눈매와 헤어에 있어요. 여기서 바뀌는 게 인상 전체를 바꿔줘요.",
+        "gap": "눈매 샤프니스, 헤어 스타일링",
+        "direction": "스타일링 중심 변화",
+      },
+      "consultant_report_full": {
+        "quote": "핵심은 눈매와 스타일에 있어요. 여기서 바뀌는 게 인상 전체를 바꿔줘요.",
+        "observation": "전반적으로 균형 잡힌 얼굴형에 부드러운 인상이 강점이에요.",
+        "impact": "현재 스타일이 눈매의 날카로움을 가리고 있어요.",
+        "gap": "눈매 샤프니스, 헤어 볼륨, 스타일링 완성도",
+        "direction": "눈매 강조 + 헤어 스타일링 + 베이직 패션 정립",
       },
       "action_cards": [
         {
           "category": "헤어스타일",
-          "icon": "scissors",
+          "principle": "레이어드로 옆선을 드러내는 게 핵심이에요. 현재 헤어가 얼굴 윤곽을 덮고 있어 인상이 묻히고 있어요.",
           "observation": "현재 헤어스타일이 얼굴 윤곽을 가리고 있어 인상이 다소 묻히고 있어요.",
-          "principle": "레이어드컷은 얼굴 옆선을 자연스럽게 드러내 윤곽을 강조하는 효과가 있어요. 볼륨과 라인을 동시에 잡을 수 있어서 인상 변화에 효율적인 방법이에요.",
-          "application": "미디엄 레이어드 또는 가르마형 앞머리로 변화를 주는 게 좋아요.",
+          "impact": "볼륨감 없는 헤어가 얼굴을 더 둥글어 보이게 해요.",
+          "change": "레이어드컷으로 옆선을 드러내고 앞머리를 정리하면 달라져요.",
+          "result": "얼굴 윤곽이 살아나고 목선이 드러나 훨씬 또렷한 인상이 나와요.",
+          "application": "핵심은 옆선이에요. 현재 헤어가 광대 라인을 덮고 있어서 인상이 묻히는 거거든요. 레이어드로 옆선을 드러내면 이 사람 얼굴형의 선이 살아나요.",
           "references": [
-            {"name": "고준희", "context": "2022 SNS 화보", "description": "쇄골 위 단발로 목선을 드러낸 자연스러운 스타일"},
-            {"name": "한지민", "context": "드라마 미스티", "description": "어깨 길이 레이어드, 옆선을 자연스럽게 강조한 스타일"}
+            {"name": "정해인", "context": "2021 달이 뜨는 강 촬영 현장 — 자연스럽게 흘러내린 앞머리로 이마를 살짝 드러낸 스타일. 이 사람과 비슷한 부드러운 인상에서 가르마를 활용한 레퍼런스", "description": "자연스러운 가르마와 레이어드로 얼굴 윤곽을 살린 스타일"},
           ],
-          "caution": null
         },
         {
-          "category": "패션/스타일링",
-          "icon": "shirt",
+          "category": "패션",
+          "principle": "상하의 컬러 통일감이 스타일링 완성도를 가장 빠르게 올려줘요. 베이직 4색(검정·흰색·회색·네이비)으로 팔레트를 정립하세요.",
           "observation": "전체적인 스타일링 완성도를 높이면 인상이 한층 달라질 수 있어요.",
-          "principle": "핏이 맞는 상의와 세로 라인을 강조하는 아이템이 세련된 인상을 만들어요. 색상 통일감도 전체적인 완성도에 크게 영향을 줘요.",
-          "application": "슬림핏 상의와 단색 위주의 조합으로 정돈된 느낌을 주세요.",
+          "impact": "현재 스타일에서 체형의 장점이 잘 드러나지 않고 있어요.",
+          "change": "세미와이드 팬츠와 원단감 있는 상의 조합이 효율적이에요.",
+          "result": "하체 라인이 정돈되고 전체적인 실루엣이 세련되게 바뀌어요.",
+          "application": "사실 이게 가장 중요한데요 — 색상 통일감이에요. 지금 상하의 컬러가 따로 노는데, 같은 톤 계열로 맞추면 전체적인 완성도가 확 올라가요.",
           "references": [
-            {"name": "정해인", "context": "2023 화보", "description": "심플한 화이트 셔츠로 깔끔한 인상 연출"},
-            {"name": "박서준", "context": "드라마 이태원클라쓰", "description": "블랙 핏 자켓으로 세련된 라인 강조"}
+            {"name": "박보검", "context": "2022 유퀴즈 출연 — 네이비 셔츠에 그레이 슬렉스 조합. 이 사람과 비슷한 친근한 인상에서 포멀함을 더한 레퍼런스", "description": "베이직 컬러 조합으로 깔끔한 인상 연출"},
           ],
-          "caution": null
         },
         {
-          "category": widget.gender == 'female' ? '메이크업' : '그루밍',
-          "icon": widget.gender == 'female' ? 'makeup' : 'grooming',
-          "observation": "눈매 연출과 눈썹 정리가 전체 인상 변화의 핵심 포인트예요.",
-          "principle": "아이라인과 마스카라로 눈매를 또렷하게 만들면 전체 인상이 달라져요. 눈썹 형태를 잡아주는 것만으로도 얼굴 정돈 효과가 크게 나타나요.",
-          "application": "눈 꼬리 라인 강조와 볼륨 마스카라로 눈매를 선명하게 만들어보세요.",
+          "category": genderLabel,
+          "observation": "눈썹 정리와 기초 그루밍이 전체 인상 변화의 핵심 포인트예요.",
+          "principle": "눈썹 하나만 잡아도 인상이 완전히 달라져요. 나머지 스타일링보다 먼저 해야 할 가장 빠른 변화예요.",
+          "impact": "정리되지 않은 눈썹이 인상을 흐리게 만들고 있어요.",
+          "change": "눈썹 결을 따라 정리하고 아치를 살짝 잡아주면 달라져요.",
+          "result": "눈매가 또렷해지고 전체 인상이 한층 정돈돼 보여요.",
+          "application": "근데 이게 제일 빠른 변화예요 — 눈썹 하나만 잡아도 인상이 완전히 달라지거든요. 나머지 스타일링 다 안 해도 눈썹 먼저 잡으세요.",
           "references": [
-            {"name": "맥 플루이드라인", "context": "#blacktrack", "description": "지속력 좋은 리퀴드 라이너로 선명한 라인 완성"},
-            {"name": "랑콤 모노시크라", "context": "01 Cils Noirs", "description": "컬링과 볼륨을 동시에, 자연스러운 눈매 완성"}
+            {"name": "위아이", "context": "2023 활동 당시 직캠 — 자연스러운 일자 눈썹으로 부드럽지만 또렷한 인상 연출", "description": "자연스러운 눈썹 정리로 또렷한 인상 완성"},
           ],
-          "caution": null
-        }
+        },
       ],
-      "milestones": [
-        {"days": 30, "description": "눈매 연출 변화 체감 시작"},
-        {"days": 60, "description": "헤어 스타일 전환 완성"},
-        {"days": 90, "description": "전체 스타일링 완성 및 인상 변화 체감"}
-      ]
+      "three_factor": {
+        "physical": "상체 라인을 살리는 핏감 있는 상의가 전체 실루엣을 정돈해줘요. 키높이 깔창으로 전체 비율도 보완할 수 있어요.",
+        "face": "눈썹 정리가 첫 번째 우선순위예요. 그다음 앞머리 정리로 이마를 드러내면 눈매가 더 또렷해 보여요.",
+        "fashion": "회색·검정·네이비·흰색 4가지 컬러로 기본 팔레트를 정립하세요. 상하의 컬러 통일감이 스타일링 완성도를 가장 빠르게 올려줘요.",
+      },
+      "makeup_steps": [
+        {
+          "step_number": 1,
+          "step_name": "기초",
+          "description": "묽은 제형부터 무거운 제형 순서로, 피부 결 따라 세로로 흡수시켜줘요.",
+          "products": [
+            {"name": "한율 부들밤 모공수축패드", "shade": null, "category": "토너패드", "usage": "세안 후 결 따라 닦아내기"},
+            {"name": "라운드랩 1025 독도 토너", "shade": null, "category": "토너", "usage": "가볍게 두드려 흡수"},
+          ],
+          "tip": "기초는 레이어링이 핵심이에요. 각 단계 30초 간격으로 흡수시켜줘요.",
+        },
+        {
+          "step_number": 2,
+          "step_name": "베이스",
+          "description": "피부 톤을 균일하게 잡아주는 단계예요.",
+          "products": [
+            {"name": "비레디 블루 파운데이션 03호", "shade": "03호", "category": "파운데이션", "usage": "소량을 전체적으로 가볍게 펴바르기"},
+            {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "파우더", "usage": "T존 중심으로 살짝 눌러 마무리"},
+          ],
+          "tip": "포인트는 소량이에요. 티 안 나게 자연스럽게 얹어주는 게 핵심이에요.",
+        },
+        {
+          "step_number": 3,
+          "step_name": "눈썹 + 음영",
+          "description": "눈썹 먼저, 그다음 쉐딩 순서로 진행해요.",
+          "products": [
+            {"name": "클리오 킬브로우 오토하드펜슬 05호", "shade": "05호 그레이브라운", "category": "눈썹", "usage": "눈썹 결 따라 그린 후 스크류로 빗어주기"},
+            {"name": "투쿨포스쿨 뉴트럴 쉐딩", "shade": null, "category": "쉐딩", "usage": "얼굴 윤곽 바깥쪽에만 살짝 블렌딩"},
+          ],
+          "tip": "쉐딩은 얼굴 윤곽 바깥쪽에만 살짝. 과하면 어색해 보여요.",
+        },
+        {
+          "step_number": 4,
+          "step_name": "마무리",
+          "description": "파우더와 픽서로 지속력을 확보해줘요.",
+          "products": [
+            {"name": "스킨푸드 피치뽀송 멀티 피니시 파우더", "shade": null, "category": "세팅파우더", "usage": "전체적으로 가볍게 눌러 세팅"},
+            {"name": "어반디케이 메이크업 픽서", "shade": null, "category": "픽서", "usage": "20cm 거리에서 가볍게 두 번 분사"},
+          ],
+          "tip": "픽서는 20cm 거리에서 가볍게 두 번. 하루 종일 지속돼요.",
+        },
+      ],
+      "fashion_looks": [
+        {
+          "name": "데일리 베이직",
+          "items": [
+            {"category": "Outer", "description": "화이트 린넨 오버핏 셔츠", "rationale": "청량감 + 레이어드"},
+            {"category": "Top", "description": "화이트 반팔 코튼 이너", "rationale": "정돈된 레이어드"},
+            {"category": "Bottom", "description": "와이드 연청 데님 팬츠", "rationale": "하체 라인 정돈"},
+            {"category": "Shoes", "description": "화이트 로우 스니커즈", "rationale": "색감 통일"},
+            {"category": "Acc", "description": "검정 가죽 벨트 (슬림)", "rationale": "포인트 + 허리 라인"},
+          ],
+          "rationale": "셔츠는 빼서 입고, 이너는 넣어서 입어요. 화이트+연청 조합으로 청량감 있어요.",
+          "styling_tip": "셔츠는 빼서, 이너는 넣어서",
+          "color_palette": ["#FFFFFF", "#A8C5DA", "#000000"],
+        },
+        {
+          "name": "세미 포멀",
+          "items": [
+            {"category": "Outer", "description": "검정 반팔 셔츠 (레귤러 핏)", "rationale": "깔끔하고 정돈된 인상"},
+            {"category": "Top", "description": "검정 이너 (넣어 입기용)", "rationale": "셔츠 넣입 깔끔하게"},
+            {"category": "Bottom", "description": "회색 세미와이드 슬랙스", "rationale": "정돈된 라인"},
+            {"category": "Shoes", "description": "앵클부츠 (키높이 깔창)", "rationale": "키 보정 + 포멀한 인상"},
+            {"category": "Acc", "description": "검정 가죽 벨트", "rationale": "상하의 통일감"},
+          ],
+          "rationale": "검정 셔츠 넣어 입기로 깔끔하게. 회색 와이드로 하체 비율 보완이 효율적이에요.",
+          "styling_tip": "검정 셔츠는 꼭 넣어서",
+          "color_palette": ["#000000", "#808080", "#1A1A1A"],
+        },
+      ],
+      "color_palette": {
+        "main": ["#000000", "#1A2238", "#FFFFFF"],
+        "accent": ["#722F37", "#C19A6B"],
+        "avoid": ["#FF00FF", "#FFFF00"],
+      },
     };
   }
 
-  Future<Map<String, dynamic>> _callFirebase(Map<String, dynamic> faceData, {String? extraInstruction}) async {
-    final impression = widget.sliderValue < 0.4
-        ? "초식계"
-        : widget.sliderValue > 0.6
-            ? "육식계"
-            : "중간계";
-
-    final imageBytes = await widget.primaryImage.readAsBytes();
-    final base64Image = base64Encode(imageBytes);
-
-    final response = await http.post(
-      Uri.parse(kAnalyzeImageUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'base64Image': base64Image,
-        'animalType': widget.animalType,
-        'impression': impression,
-        'faceData': faceData,
-        'gender': widget.gender,
-        'isPro': widget.isPro,
-        if (extraInstruction != null) 'extraInstruction': extraInstruction,
-      }),
-    );
-
-    if (response.statusCode == 403 || response.statusCode == 400) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final errorCode = body['error']?.toString() ?? '';
-      final message = body['message']?.toString() ?? '다른 사진을 사용해주세요.';
-      throw _AnalysisException(errorCode, message);
-    }
-    if (response.statusCode != 200) {
-      throw Exception('서버 오류: ${response.statusCode}');
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    // 새 API는 { success, data } 구조, 구버전은 flat 구조
-    return decoded.containsKey('data') ? decoded['data'] as Map<String, dynamic> : decoded;
-  }
 
   @override
   void dispose() {

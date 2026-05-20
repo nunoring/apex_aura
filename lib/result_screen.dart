@@ -16,7 +16,6 @@ import 'widgets/gap_progress_bar.dart';
 import 'widgets/gap_radar_chart.dart';
 import 'widgets/consultant_report.dart';
 import 'widgets/action_card.dart';
-import 'widgets/appearance_score_widget.dart';
 import 'widgets/grooming_keyword_chip.dart';
 import 'widgets/three_factor_hub.dart';
 import 'widgets/makeup_step_card.dart';
@@ -30,7 +29,11 @@ import 'widgets/pro_paywall_sheet.dart';
 import 'widgets/animal_match_widget.dart';
 import 'widgets/main_animal_flip_card.dart';
 import 'widgets/sub_animal_card.dart';
+import 'widgets/animal_detail_sheet.dart';
 import 'widgets/target_animal_card.dart';
+import 'widgets/celeb_match_card.dart';
+import 'widgets/share_result_card.dart';
+import 'services/animal_score_service.dart';
 
 class ResultScreen extends StatefulWidget {
   final String animalType;
@@ -105,8 +108,6 @@ class _ResultScreenState extends State<ResultScreen> {
     final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
     final animalMatch = fi?['animal_match'] as Map<String, dynamic>?;
     final mainAnimal = fi?['main_animal'] as Map<String, dynamic>?;
-    final appearanceScore = analysisResult['appearance_score'] as Map<String, dynamic>?;
-    final rawScores = analysisResult['scores'] as Map<String, dynamic>?;
 
     return SingleChildScrollView(
       child: Column(
@@ -124,20 +125,6 @@ class _ResultScreenState extends State<ResultScreen> {
                     animalType: mainAnimal?['name']?.toString() ?? widget.animalType,
                     percentage: (animalMatch['percentage'] as num?)?.toInt() ?? 80,
                     similarityPoints: List<String>.from(animalMatch['similarity_points'] ?? []),
-                  ),
-                ],
-                if (appearanceScore != null && rawScores != null) ...[
-                  const SizedBox(height: 16),
-                  AppearanceScoreWidget(
-                    score: (appearanceScore['score'] as num?)?.toInt() ?? 70,
-                    maxScore: (appearanceScore['max_score'] as num?)?.toInt() ?? 100,
-                    scores: {
-                      'eye': (rawScores['eye'] as num?)?.toDouble() ?? 6.5,
-                      'balance': (rawScores['balance'] as num?)?.toDouble() ?? 6.5,
-                      'face_shape': (rawScores['face_shape'] as num?)?.toDouble() ?? 6.5,
-                      'eye_distance': (rawScores['eye_distance'] as num?)?.toDouble() ?? 6.5,
-                      'skin': (rawScores['skin'] as num?)?.toDouble() ?? 6.5,
-                    },
                   ),
                 ],
               ],
@@ -179,6 +166,17 @@ class _ResultScreenState extends State<ResultScreen> {
     const map = {'강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊', '곰상': '🐻', '토끼상': '🐰', '사슴상': '🦌', '늑대상': '🐺'};
     for (final e in map.entries) { if (name.contains(e.key.replaceAll('상', ''))) return e.value; }
     return '✨';
+  }
+
+  String? _animalImgPath(String name) {
+    const keyMap = {
+      '강아지상': 'dog', '고양이상': 'cat', '여우상': 'fox',
+      '곰상': 'bear', '늑대상': 'wolf', '토끼상': 'rabbit', '사슴상': 'deer',
+    };
+    final key = keyMap[name];
+    if (key == null) return null;
+    final gender = widget.gender == 'female' ? 'female' : 'male';
+    return 'assets/images/${key}_$gender.png';
   }
 
   Widget _ratioItem(String label, String value) {
@@ -243,6 +241,7 @@ class _ResultScreenState extends State<ResultScreen> {
             emoji: mainA['emoji']?.toString() ?? '',
             keywords: List<String>.from(mainA['keywords'] ?? []),
             strengths: strengths,
+            imagePath: _animalImgPath(mainA['name']?.toString() ?? ''),
             tip: mainA['tip']?.toString() ?? '',
           ),
           const SizedBox(height: 12),
@@ -253,6 +252,7 @@ class _ResultScreenState extends State<ResultScreen> {
               emoji: subA['emoji']?.toString() ?? '',
               keywords: List<String>.from(subA['keywords'] ?? []),
               comment: subA['comment']?.toString() ?? '',
+              imagePath: _animalImgPath(subA['name']?.toString() ?? ''),
             ),
           const SizedBox(height: 10),
 
@@ -262,7 +262,11 @@ class _ResultScreenState extends State<ResultScreen> {
               emoji: targetA['emoji']?.toString() ?? '',
               keywords: List<String>.from(targetA['keywords'] ?? []),
               comment: targetA['comment']?.toString() ?? '',
+              imagePath: _animalImgPath(targetA['name']?.toString() ?? ''),
             ),
+          const SizedBox(height: 16),
+          // 셀럽 닮은꼴
+          _buildCelebMatchSection(),
         ],
       ),
     );
@@ -382,7 +386,19 @@ class _ResultScreenState extends State<ResultScreen> {
           _buildPage3Free(),
           if (radar != null) ...[
             const SizedBox(height: 16),
-            const Text('능력치 레이더', style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
+            Row(
+              children: const [
+                Text('능력치 레이더', style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
+                Spacer(),
+                Icon(Icons.circle, size: 8, color: Color(0xFFE8A030)),
+                SizedBox(width: 4),
+                Text('현재', style: TextStyle(fontSize: 10, color: Color(0xFF888888))),
+                SizedBox(width: 12),
+                Icon(Icons.circle, size: 8, color: Color(0xFF4A90D9)),
+                SizedBox(width: 4),
+                Text('목표', style: TextStyle(fontSize: 10, color: Color(0xFF888888))),
+              ],
+            ),
             const SizedBox(height: 12),
             _buildRadarChart(radar),
           ],
@@ -586,10 +602,9 @@ class _ResultScreenState extends State<ResultScreen> {
                     ],
                     if (products.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      ...products.map((p) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text('• ${p['name'] ?? ''} — ${p['description'] ?? ''}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF777777))),
+                      ...products.map((p) => _buildAffiliateProductRow(
+                        name: p['name']?.toString() ?? '',
+                        shade: p['shade']?.toString(),
                       )),
                     ],
                     if (step['tip'] != null) ...[
@@ -630,7 +645,7 @@ class _ResultScreenState extends State<ResultScreen> {
           ] else
             const Center(child: Text('메이크업 데이터가 없어요', style: TextStyle(fontSize: 13, color: Color(0xFF444444)))),
 
-          // Phase 2: _buildAffiliateDisclaimer() 복원
+          _buildAffiliateDisclaimer(),
         ],
       ),
     );
@@ -659,7 +674,10 @@ class _ResultScreenState extends State<ResultScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('패션 룩', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          const Text('얼굴형·체형 수치 기반 제안 — 현재 착장과 다를 수 있어요',
+              style: TextStyle(fontSize: 11, color: Color(0xFF555555))),
+          const SizedBox(height: 12),
 
           if (looks.isNotEmpty)
             ...looks.map((look) => Container(
@@ -684,10 +702,11 @@ class _ResultScreenState extends State<ResultScreen> {
                     const SizedBox(height: 8),
                     ...(look['items'] as List).map((item) {
                       final im = item as Map;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: Text('• ${im['name'] ?? im.toString()}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF666666))),
+                      final productName = im['description']?.toString() ?? im['name']?.toString() ?? '';
+                      final category = im['category']?.toString() ?? '';
+                      return _buildAffiliateProductRow(
+                        name: productName,
+                        prefix: category.isNotEmpty ? category : null,
                       );
                     }),
                   ],
@@ -721,8 +740,169 @@ class _ResultScreenState extends State<ResultScreen> {
             ),
           ],
 
+          _buildAffiliateDisclaimer(),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  Widget _journeyRow(String label, int reduction, Color color) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF888888))),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withAlpha(30),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text('-$reduction%',
+              style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnimalCompositeBar() {
+    final scores = AnimalScoreService.calculate(faceData);
+    if (scores.isEmpty) return const SizedBox.shrink();
+    final sorted = scores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    const emojiMap = {
+      '강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊',
+      '사슴상': '🦌', '늑대상': '🐺', '토끼상': '🐰', '곰상': '🐻',
+    };
+    final colors = [
+      const Color(0xFFE8D5B7),
+      const Color(0xFF4A90D9),
+      const Color(0xFF27AE60),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('동물상 구성',
+              style: TextStyle(fontSize: 11, color: Color(0xFF666666))),
+          const SizedBox(height: 10),
+          // 복합 바
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Row(
+              children: sorted.asMap().entries.map((e) {
+                final pct = e.value.value / 100;
+                final color = colors[e.key % colors.length];
+                return Expanded(
+                  flex: e.value.value.round(),
+                  child: Container(
+                    height: 10,
+                    color: color,
+                    margin: EdgeInsets.only(right: e.key < sorted.length - 1 ? 1 : 0),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 레이블
+          Wrap(
+            spacing: 10, runSpacing: 4,
+            children: sorted.asMap().entries.map((e) {
+              final color = colors[e.key % colors.length];
+              final emoji = emojiMap[e.value.key] ?? '✨';
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 8, height: 8,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                  const SizedBox(width: 4),
+                  Text('$emoji ${e.value.key} ${e.value.value.round()}%',
+                      style: TextStyle(fontSize: 10, color: color)),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCelebMatchSection() {
+    final currentType = faceData['current_face_type']?.toString() ?? '';
+    final celebs = AnimalScoreService.getCelebs(currentType, widget.gender);
+    if (celebs.isEmpty) return const SizedBox.shrink();
+    return CelebMatchCard(
+      userImage: imageFile,
+      animalName: currentType,
+      gender: widget.gender,
+      celebs: celebs,
+    );
+  }
+
+  Widget _buildAffiliateProductRow({required String name, String? shade, String? prefix}) {
+    if (name.isEmpty) return const SizedBox.shrink();
+    final query = Uri.encodeComponent(name);
+    final displayName = [
+      if (prefix != null) prefix,
+      name,
+      if (shade != null) shade,
+    ].join(' ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          const Text('•', style: TextStyle(fontSize: 11, color: Color(0xFF555555))),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(displayName,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF888888))),
+          ),
+          GestureDetector(
+            onTap: () => launchUrl(
+              Uri.parse('https://www.coupang.com/np/search?q=$query'),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1000),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFE8A030).withAlpha(60), width: 0.5),
+              ),
+              child: const Text('쿠팡 검색',
+                  style: TextStyle(fontSize: 9, color: Color(0xFFE8A030))),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAffiliateDisclaimer() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D0D0D),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+        ),
+        child: const Text(
+          '이 링크는 쿠팡 파트너스 제휴 링크로, 구매 시 일정 수수료가 제공될 수 있습니다.',
+          style: TextStyle(fontSize: 9, color: Color(0xFF444444), height: 1.4),
+        ),
       ),
     );
   }
@@ -890,12 +1070,24 @@ class _ResultScreenState extends State<ResultScreen> {
                   gapPercent > 60 ? '목표까지 큰 변화가 필요해요' : gapPercent > 30 ? '스타일링으로 충분히 도달할 수 있어요' : '현재와 목표가 가까워요',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
                 ),
+                // 여정 프레이밍
+                const SizedBox(height: 10),
+                Container(height: 0.5, color: const Color(0xFF1E1E1E)),
+                const SizedBox(height: 10),
+                const Text('변화하면 줄어드는 갭',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF555555))),
+                const SizedBox(height: 6),
+                _journeyRow('헤어 스타일링', 15, const Color(0xFF27AE60)),
+                const SizedBox(height: 4),
+                _journeyRow('패션 정립', 20, const Color(0xFF4A90D9)),
+                const SizedBox(height: 4),
+                _journeyRow('그루밍', 10, const Color(0xFFE8A030)),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // ConsultantReport
+          // ConsultantReport — Free: quote만 공개, 나머지 잠금
           if (report != null)
             Container(
               padding: const EdgeInsets.all(16),
@@ -907,25 +1099,74 @@ class _ResultScreenState extends State<ResultScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: const [
-                    Icon(Icons.person_outline, size: 14, color: Color(0xFFE8A030)),
-                    SizedBox(width: 6),
-                    Text('컨설턴트 리포트', style: TextStyle(fontSize: 12, color: Color(0xFFE8A030), fontWeight: FontWeight.w600)),
-                  ]),
+                  Row(
+                    children: const [
+                      Icon(Icons.person_outline, size: 14, color: Color(0xFFE8A030)),
+                      SizedBox(width: 6),
+                      Text('컨설턴트 리포트', style: TextStyle(fontSize: 12, color: Color(0xFFE8A030), fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                   const SizedBox(height: 10),
+                  // quote 공개
                   if (report['quote'] != null)
                     Text('"${report['quote']}"',
                         style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontStyle: FontStyle.italic, height: 1.5)),
-                  if (report['gap'] != null) ...[
-                    const SizedBox(height: 10),
-                    Text(report['gap'].toString(),
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
-                  ],
-                  if (report['direction'] != null) ...[
-                    const SizedBox(height: 6),
-                    Text(report['direction'].toString(),
-                        style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA), height: 1.5)),
-                  ],
+                  const SizedBox(height: 12),
+                  // 갭 분석 + 변화 방향 잠금 티저
+                  GestureDetector(
+                    onTap: _showPaywall,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F0F0F),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF2A1A00), width: 0.5),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Stack(
+                            children: [
+                              Opacity(
+                                opacity: 0.13,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(report['gap']?.toString() ?? '핵심 갭 요소 분석 결과가 있어요',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+                                    const SizedBox(height: 4),
+                                    Text(report['direction']?.toString() ?? '가장 효율적인 변화 방향을 제안해드려요',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA), height: 1.5)),
+                                  ],
+                                ),
+                              ),
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [Color(0x000F0F0F), Color(0xFF0F0F0F)],
+                                      stops: [0.0, 0.6],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Row(
+                            children: [
+                              Icon(Icons.lock_outline, size: 12, color: Color(0xFFE8A030)),
+                              SizedBox(width: 6),
+                              Text('갭 분석 · 변화 방향 — Pro에서 확인',
+                                  style: TextStyle(fontSize: 11, color: Color(0xFFE8A030))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -952,55 +1193,12 @@ class _ResultScreenState extends State<ResultScreen> {
           const Text('변신 플랜', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
 
-          // 액션 카드 3개
-          ...actionCards.map((card) {
-            final c = card as Map<String, dynamic>;
-            final refs = (c['references'] as List?) ?? [];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(c['category']?.toString() ?? '',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFFE8A030), fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  if (c['observation'] != null)
-                    Text(c['observation'].toString(),
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
-                  if (c['application'] != null) ...[
-                    const SizedBox(height: 6),
-                    Text(c['application'].toString(),
-                        style: const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC), height: 1.5)),
-                  ],
-                  if (refs.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6, runSpacing: 4,
-                      children: refs.map((ref) {
-                        final rm = ref as Map;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1A1A),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
-                          ),
-                          child: Text('${rm['name']} · ${rm['context']}',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
+          // 첫 번째 카드만 공개, 나머지는 잠금 티저
+          if (actionCards.isNotEmpty)
+            _buildFullActionCard(actionCards.first as Map<String, dynamic>),
+          ...actionCards.skip(1).map((card) =>
+            _buildLockedActionCard(card as Map<String, dynamic>),
+          ),
 
           const SizedBox(height: 16),
 
@@ -1094,6 +1292,129 @@ class _ResultScreenState extends State<ResultScreen> {
         ],
       ),    // Column
     ),      // RepaintBoundary
+    );
+  }
+
+  Widget _buildFullActionCard(Map<String, dynamic> c) {
+    final refs = (c['references'] as List?) ?? [];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(c['category']?.toString() ?? '',
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE8A030), fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          if (c['observation'] != null)
+            Text(c['observation'].toString(),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+          if (c['application'] != null) ...[
+            const SizedBox(height: 6),
+            Text(c['application'].toString(),
+                style: const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC), height: 1.5)),
+          ],
+          if (refs.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6, runSpacing: 4,
+              children: refs.map((ref) {
+                final rm = ref as Map;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF2A2A2A), width: 0.5),
+                  ),
+                  child: Text('${rm['name']} · ${rm['context']}',
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLockedActionCard(Map<String, dynamic> c) {
+    return GestureDetector(
+      onTap: _showPaywall,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF2A1A00), width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(c['category']?.toString() ?? '',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFFE8A030), fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1000),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline, size: 11, color: Color(0xFFE8A030)),
+                      SizedBox(width: 4),
+                      Text('Pro', style: TextStyle(fontSize: 10, color: Color(0xFFE8A030))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Stack(
+              children: [
+                Opacity(
+                  opacity: 0.13,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(c['observation']?.toString() ?? '현재 상태를 분석했어요',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+                      const SizedBox(height: 4),
+                      Text(c['application']?.toString() ?? '구체적인 개선 방향이 있어요',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC), height: 1.5)),
+                    ],
+                  ),
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x000F0F0F), Color(0xFF0F0F0F)],
+                        stops: [0.0, 0.65],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text('Pro에서 전체 분석 보기 →',
+                style: TextStyle(fontSize: 11, color: Color(0xFFE8A030))),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1472,33 +1793,37 @@ class _ResultScreenState extends State<ResultScreen> {
                 children: [
                   Image.file(imageFile, fit: BoxFit.cover),
                   CustomPaint(painter: FaceOverlayPainter(faceData)),
-                  // 현재 동물상 배지 (좌하단)
+                  // 현재 동물상 배지 (좌하단) — 탭하면 상세 설명
                   Positioned(
                     bottom: 10, left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(180),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(info?.emoji ?? '', style: const TextStyle(fontSize: 16)),
-                          const SizedBox(width: 6),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(currentType,
-                                  style: const TextStyle(
-                                      fontSize: 13, fontWeight: FontWeight.w700,
-                                      color: Color(0xFFE8D5B7))),
-                              const Text('AI 판정',
-                                  style: TextStyle(fontSize: 9, color: Color(0xFF888877))),
-                            ],
-                          ),
-                        ],
+                    child: GestureDetector(
+                      onTap: () => AnimalDetailSheet.show(context, currentType, faceData, widget.gender),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withAlpha(180),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE8D5B7).withAlpha(60), width: 0.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(info?.emoji ?? '', style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 6),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(currentType,
+                                    style: const TextStyle(
+                                        fontSize: 13, fontWeight: FontWeight.w700,
+                                        color: Color(0xFFE8D5B7))),
+                                const Text('AI 판정  ›',
+                                    style: TextStyle(fontSize: 9, color: Color(0xFFE8A030))),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1581,6 +1906,9 @@ class _ResultScreenState extends State<ResultScreen> {
               ],
             ),
           ),
+          // 동물상 복합 %
+          const SizedBox(height: 12),
+          _buildAnimalCompositeBar(),
           // 능력치 종합 카드
           const SizedBox(height: 12),
           _buildAbilityCard(),
@@ -2627,8 +2955,32 @@ class _ResultScreenState extends State<ResultScreen> {
   Future<void> _shareResult() async {
     setState(() => _isSharing = true);
     try {
+      final s = _abilityScores;
+      final scores = AnimalScoreService.calculate(faceData);
+      final sorted = scores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      const emojiMap = {
+        '강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊',
+        '사슴상': '🦌', '늑대상': '🐺', '토끼상': '🐰', '곰상': '🐻',
+      };
+
+      final mainAnimal = sorted.isNotEmpty ? sorted[0].key : (faceData['current_face_type']?.toString() ?? animalType);
+      final subAnimal = sorted.length > 1 ? sorted[1].key : '고양이상';
+
       final Uint8List image = await _screenshotController.captureFromWidget(
-        _buildShareCard(),
+        ShareResultCard(
+          mainAnimal: mainAnimal,
+          mainEmoji: emojiMap[mainAnimal] ?? '🐶',
+          mainPercent: sorted.isNotEmpty ? sorted[0].value.round() : 70,
+          subAnimal: subAnimal,
+          subEmoji: emojiMap[subAnimal] ?? '🐱',
+          subPercent: sorted.length > 1 ? sorted[1].value.round() : 20,
+          targetAnimal: animalType,
+          targetEmoji: emojiMap[animalType] ?? '🦊',
+          totalScore: s.total,
+          tier: s.tier,
+          tierColor: s.tierColor,
+          gapPercent: (analysisResult['comparison']?['gap_percent'] as num?)?.toInt() ?? 45,
+        ),
         pixelRatio: 3.0,
         context: context,
       );
@@ -2637,13 +2989,12 @@ class _ResultScreenState extends State<ResultScreen> {
       final file = File('${dir.path}/apex_aura_result.png');
       await file.writeAsBytes(image);
 
-      final s = _abilityScores;
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: '나는 ${s.tier}등급 ${faceData['current_face_type'] ?? animalType}! (${s.total}/100점)\n'
-              '${s.tagline}\n\n'
+        text: '나는 $mainAnimal ${sorted.isNotEmpty ? sorted[0].value.round() : 70}%\n'
+              '목표: $animalType 🔥\n\n'
               '내 얼굴 AI 분석하기 👇\n'
-              'https://play.google.com/store/apps/details?id=com.vacman.apex_aura',
+              '#ApexAura #동물상분석',
       );
     } finally {
       if (mounted) setState(() => _isSharing = false);

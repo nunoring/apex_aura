@@ -18,6 +18,7 @@ class MainAnimalFlipCard extends StatefulWidget {
   final List<String> keywords;
   final List<Strength> strengths;
   final String tip;
+  final String? imagePath;
 
   const MainAnimalFlipCard({
     super.key,
@@ -26,6 +27,7 @@ class MainAnimalFlipCard extends StatefulWidget {
     required this.keywords,
     required this.strengths,
     required this.tip,
+    this.imagePath,
   });
 
   @override
@@ -103,8 +105,22 @@ class _MainAnimalFlipCardState extends State<MainAnimalFlipCard>
               style: TextStyle(
                   color: _gold, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1)),
           const SizedBox(height: 16),
-          Text(widget.emoji, style: const TextStyle(fontSize: 60)),
-          const SizedBox(height: 8),
+          // 이미지 우선, 없으면 이모지
+          if (widget.imagePath != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                widget.imagePath!,
+                width: 110,
+                height: 110,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Text(widget.emoji, style: const TextStyle(fontSize: 60)),
+              ),
+            )
+          else
+            Text(widget.emoji, style: const TextStyle(fontSize: 60)),
+          const SizedBox(height: 12),
           Text(widget.name,
               style: const TextStyle(
                   color: _gold, fontSize: 22, fontWeight: FontWeight.bold)),
@@ -142,7 +158,18 @@ class _MainAnimalFlipCardState extends State<MainAnimalFlipCard>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Text(widget.emoji, style: const TextStyle(fontSize: 22)),
+            if (widget.imagePath != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  widget.imagePath!,
+                  width: 28, height: 28, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Text(widget.emoji, style: const TextStyle(fontSize: 22)),
+                ),
+              )
+            else
+              Text(widget.emoji, style: const TextStyle(fontSize: 22)),
             const SizedBox(width: 8),
             Text('${widget.name}의 매력',
                 style: const TextStyle(

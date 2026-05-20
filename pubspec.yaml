@@ -29,6 +29,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   google_mlkit_face_detection: ^0.11.0
+  google_generative_ai: ^0.4.0
   http: ^1.2.0
   flutter:
     sdk: flutter

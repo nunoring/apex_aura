@@ -1,6 +1,9 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const { OpenAI } = require("openai");
+const { defineSecret } = require("firebase-functions/params");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const cors = require("cors")({ origin: true });
+
+const geminiKey = defineSecret("GEMINI_API_KEY");
 
 // ─── 금지 단어 목록 ───────────────────────────────────────────
 const BANNED_PATTERNS = [
@@ -31,9 +34,9 @@ const ANIMAL_CATALOG = [
 const CATALOG_NAMES = ANIMAL_CATALOG.map(a => a.name).join(", ");
 
 // ─── GPT 시스템 프롬프트 ─────────────────────────────────────
-const SYSTEM_PROMPT = `당신은 10년 경력 전문 이미지 컨설턴트입니다.
-사진 한 장에서 이 사람만의 특징을 정밀하게 관찰하고,
-왜 그런 인상이 만들어지는지 메커니즘과 함께 설명합니다.
+const SYSTEM_PROMPT = `당신은 10년 경력 퍼스널 스타일리스트입니다.
+사진 속 헤어스타일, 패션, 그루밍 상태를 관찰하고
+목표 스타일 방향으로 구체적인 스타일링 개선 방향을 제안합니다.
 
 ## CRITICAL RULE 1 — 개인 관찰 의무
 모든 특징 서술은 반드시 "현재 사진에서 보이는 ___" 또는
@@ -69,11 +72,21 @@ animal_match.reasons는 반드시 3개 이상.
 대비: "근데", "다만", "사실"
 긍정: "충분히 가능해요", "잘 어울려요"
 
-## CRITICAL RULE 6 — 셀럽 레퍼런스
-셀럽명 + 작품/활동명 + 시기 + 구체적 장면/스타일 모두 포함.
-❌ "한지민의 미디엄 레이어드"
+## CRITICAL RULE 6 — 셀럽 레퍼런스 (3요소 의무)
+반드시 아래 3요소를 모두 포함해야 합니다:
+① 장면: 셀럽명 + 작품/활동명(연도) + 구체적 장면
+② 연결: 이 셀럽이 이 사람의 [관찰된 특징]과 유사한 이유
+③ 포인트: 어떤 스타일 요소가 어떤 인상 변화를 만드는지
+
+❌ "한지민의 미디엄 레이어드 — 윤곽을 살려줘요"
 ✅ "한지민 '나의 해방일지'(2022) 중반부 출근 장면 — 귀 아래로
-    자연스럽게 흘러내리는 옆머리가 얼굴 옆선을 살짝 드러내는 스타일"
+    자연스럽게 흘러내리는 옆머리. 이 사람과 같은 둥근 얼굴형에서
+    옆선을 살짝 드러내는 방식이 얼굴 폭을 좁아 보이게 해요"
+
+❌ "정해인 스타일 참고"
+✅ "정해인 '밥 잘 사주는 예쁜 누나'(2018) 카페 장면 — 약간 내려온
+    앞머리와 자연스럽게 흘러내린 옆머리. 현재 이 사람의 높은 이마와
+    비슷한 조건에서 이마를 가리지 않고 자연스럽게 처리한 레퍼런스"
 
 ## 동물상 카탈로그 (반드시 이 7종에서만 선택)
 강아지상 🐶 — 부드러움, 친근함, 자연스러움
@@ -160,7 +173,7 @@ const FREE_SCHEMA_INSTRUCTION = `
       "change": "어떻게 바꾸면 되는지 구체적 방법 (30자 이상)",
       "result": "바꾼 후 어떤 인상이 나오는지 (30자 이상)",
       "application": "위 4요소(관찰→영향→변화→결과)를 자연스럽게 연결한 전체 설명. 강조 어휘(핵심은/사실/근데/여기서 바뀌는) 최소 1개 포함. 120자 이상.",
-      "references": [{"name": "셀럽명", "context": "작품명(연도) + 구체적 장면/스타일 (30자 이상)", "description": "어떤 스타일 요소 참고 (20자 이상)"}]
+      "references": [{"name": "셀럽명", "context": "작품명(연도) + 구체적 장면 + 이 사람 특징과의 연결 이유 (50자 이상)", "description": "어떤 스타일 요소가 어떤 인상 변화를 만드는지 (30자 이상)"}]
     },
     {
       "category": "패션",
@@ -195,8 +208,6 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
 - animal_match.reasons: 반드시 3개 이상, 각 40자 이상
 - animal_match.gap_to_target.changeable: 최소 2개, fixed: 최소 1개
 - animal_match.percentage: 60~95 범위
-- scores 각 항목(eye/balance/face_shape/eye_distance/skin): 0.0~10.0 범위 실수
-- appearance_score.score: 60~85 범위 정수 (100 금지), scores 5개 평균 기반 산출
 - first_impression.animal_match.percentage: 60~95 범위 (100 금지)
 - first_impression.animal_match.similarity_points: 정확히 3개, 각 30자↑, 일반론 금지
 - first_impression.main_animal.strengths: 정확히 3개, 각 description 30자↑
@@ -255,17 +266,6 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       ]
     }
   },
-  "scores": {
-    "eye": 0.0,
-    "balance": 0.0,
-    "face_shape": 0.0,
-    "eye_distance": 0.0,
-    "skin": 0.0
-  },
-  "appearance_score": {
-    "score": 0,
-    "max_score": 100
-  },
   "face_analysis": {
     "ratio_horizontal_vertical": "1:1.XX",
     "top_face_percent": 0,
@@ -311,7 +311,7 @@ CRITICAL: 아래 필드는 반드시 채워야 합니다 (빈 값 금지):
       "change": "어떻게 바꾸면 되는지 구체적 방법 (30자 이상)",
       "result": "바꾼 후 어떤 인상이 나오는지 (30자 이상)",
       "application": "위 4요소(관찰→영향→변화→결과)를 자연스럽게 연결한 전체 설명. 강조 어휘(핵심은/사실/근데/여기서 바뀌는) 최소 1개 포함. 120자 이상.",
-      "references": [{"name": "셀럽명", "context": "작품명(연도) + 구체적 장면/스타일 (30자 이상)", "description": "어떤 스타일 요소 참고 (20자 이상)"}]
+      "references": [{"name": "셀럽명", "context": "작품명(연도) + 구체적 장면 + 이 사람 특징과의 연결 이유 (50자 이상)", "description": "어떤 스타일 요소가 어떤 인상 변화를 만드는지 (30자 이상)"}]
     },
     {
       "category": "패션",
@@ -524,16 +524,6 @@ function validateProResponse(result) {
     if (!am.gap_to_target?.changeable || am.gap_to_target.changeable.length < 2) return false;
     if (!am.gap_to_target?.fixed || am.gap_to_target.fixed.length < 1) return false;
     if (!am.similarity_points || am.similarity_points.length < 3) return false;
-    // scores 검증
-    const scores = result.scores;
-    if (!scores) return false;
-    for (const key of ['eye', 'balance', 'face_shape', 'eye_distance', 'skin']) {
-      if (typeof scores[key] !== 'number' || scores[key] < 0 || scores[key] > 10) return false;
-    }
-    // appearance_score 검증
-    const as = result.appearance_score;
-    if (!as || typeof as.score !== 'number') return false;
-    if (as.score < 60 || as.score > 85) return false;
     // 컨설턴트 리포트 4요소
     const report = result.consultant_report_full;
     if (!report) return false;
@@ -614,7 +604,7 @@ JSON만: {"result": "ok"}`,
 
 // ─── 메인 함수 ────────────────────────────────────────────────
 exports.analyzeImage = onRequest(
-  { timeoutSeconds: 120, memory: "512MiB" },
+  { secrets: [geminiKey], timeoutSeconds: 120, memory: "512MiB" },
   async (req, res) => {
     cors(req, res, async () => {
       if (req.method === "OPTIONS") return res.status(204).send("");
@@ -638,42 +628,23 @@ exports.analyzeImage = onRequest(
           return res.status(400).json({ error: "imageBase64 and faceData required" });
         }
 
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const schemaInstruction = isPro ? PRO_SCHEMA_INSTRUCTION : FREE_SCHEMA_INSTRUCTION;
         const userPrompt = buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction);
 
-        // 1차 시도 (이미지 + 수치 텍스트 동시 분석)
+        // 1차 시도 (Claude Vision)
         let result;
         try {
-          result = await callGPT(openai, userPrompt, imgData, mimeType);
-        } catch (gptErr) {
-          console.log("GPT 실패 — 폴백 사용:", gptErr.message);
+          result = await callGPT(userPrompt, imgData, mimeType);
+        } catch (claudeErr) {
+          console.error("Gemini 실패 — 폴백 사용:", claudeErr.constructor?.name, claudeErr.message);
           result = getFallbackResponse(isPro);
-          return res.status(200).json({ ...result, skinAnalysis: result.scores || {} });
+          return res.status(200).json({ ...result });
         }
 
-        // 검증 (금지 단어 + 필수 필드)
-        const validator = isPro ? validateProResponse : validateFreeResponse;
-        const resultText = JSON.stringify(result);
-        const hasBanned = containsBanned(resultText);
-        const isValid = validator(result);
-
-        if (hasBanned || !isValid) {
-          console.log(`1차 재시도 — 금지어: ${hasBanned}, 검증실패: ${!isValid}`);
-          const retryPrompt = userPrompt +
-            (hasBanned ? "\n\n[중요] 시술/성형/의료/신체비하 표현 없이 다시 작성하세요." : "") +
-            (!isValid && isPro ? "\n\n[중요] makeup_steps 4개, fashion_looks 2개, consultant_report_full 5개 필드 모두 채워주세요." : "");
-
-          try {
-            result = await callGPT(openai, retryPrompt, imgData, mimeType);
-          } catch (e) {
-            result = getFallbackResponse(isPro);
-          }
-
-          if (containsBanned(JSON.stringify(result)) || !validator(result)) {
-            console.log("2차 재시도 실패 — 폴백 사용");
-            result = getFallbackResponse(isPro);
-          }
+        // 금지 단어 체크만 유지 (재시도 제거 — 쿼터 절약)
+        if (containsBanned(JSON.stringify(result))) {
+          console.log("금지어 감지 — 폴백 사용");
+          result = getFallbackResponse(isPro);
         }
 
         // AI 티 로깅 (재시도 없음 — 속도 최적화)
@@ -681,7 +652,7 @@ exports.analyzeImage = onRequest(
         if (aiToneIssues.length > 0) console.log('AI 티 감지 (로그만):', aiToneIssues.slice(0, 3));
 
         // 기존 클라이언트 호환 (skinAnalysis 없이도 동작하도록)
-        return res.status(200).json({ ...result, skinAnalysis: result.scores || {} });
+        return res.status(200).json({ ...result });
       } catch (error) {
         console.error("analyzeImage error:", error);
         return res.status(500).json({
@@ -707,21 +678,21 @@ function buildUserPrompt(isPro, animalType, gender, faceData, schemaInstruction)
   const currentFaceType = faceData?.current_face_type ?? "미분류";
   const symmetryScore = faceData?.symmetry_score ?? 80;
 
-  return `사진 속 인물의 헤어스타일, 그루밍, 패션 스타일을 분석하고 개선 방향을 제시해주세요.
+  return `사진 속 스타일링 현황을 파악하고, 아래 측정 데이터를 활용해 목표 스타일 방향으로 구체적인 스타일링 제안을 해주세요.
 
-## 분석 참고 데이터
+## 스타일링 참고 데이터 (사전 측정값)
 - 목표 스타일: ${animalType || "여우상"} 계열
 - 성별: ${genderKo}
 - 눈꼬리 각도: ${eyeAngle}° (${eyeAngleDesc}), 얼굴형: ${faceShape}, 눈간격: ${eyeGapDesc}
 
-## 분석 방향
+## 제안 방향
 1. 헤어/그루밍 현재 상태와 개선 방향
 2. 패션 스타일링 방향
 3. 목표 스타일까지의 변화 포인트
-${isPro ? `4. 얼굴 비율 진단 (수치 기반으로 추정)
-5. 스타일링 완성도 점수 (6.0~8.0)
-6. 메이크업 4단계 구체 제품 추천
-7. 패션 룩 2벌 제안` : ""}
+※ 셀럽 레퍼런스는 반드시 이 사람의 관찰된 특징과 연결하세요. 일반적인 셀럽 나열 금지.
+${isPro ? `4. 스타일링 완성도 점수 (6.0~8.0)
+5. 메이크업 4단계 구체 제품 추천
+6. 패션 룩 2벌 제안` : ""}
 
 ## 동물상 분류 기준 (ANIMAL_CATALOG)
 ${ANIMAL_CATALOG.map(a => `${a.name} ${a.emoji} — ${a.keywords.join(", ")}`).join("\n")}
@@ -732,31 +703,21 @@ ${ANIMAL_CATALOG.map(a => `${a.name} ${a.emoji} — ${a.keywords.join(", ")}`).j
 ${schemaInstruction}`;
 }
 
-// ─── GPT 호출 헬퍼 ────────────────────────────────────────────
-async function callGPT(openai, userPrompt, imageBase64, mimeType) {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    max_tokens: 2500,
-    temperature: 0.5,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:${mimeType};base64,${imageBase64}`,
-              detail: "auto",
-            },
-          },
-          { type: "text", text: userPrompt },
-        ],
-      },
-    ],
+// ─── Gemini 호출 헬퍼 ─────────────────────────────────────────
+async function callGPT(userPrompt, imageBase64, mimeType) {
+  const genAI = new GoogleGenerativeAI(geminiKey.value().replace(/^﻿/, '').trim());
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
   });
 
-  const raw = response.choices[0].message.content;
+  const result = await model.generateContent([
+    { inlineData: { data: imageBase64, mimeType } },
+    userPrompt,
+  ]);
+
+  const raw = result.response.text();
   const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
   try {
@@ -865,8 +826,6 @@ function getFallbackResponse(isPro) {
         { part: "입술", feature: "현재 사진에서 보이는 입술이 적당한 두께에 상하 비율이 균형 잡혀 있어요", impact: "강하지도 약하지도 않은 중립적 인상을 만들어줘요" },
       ],
     },
-    scores: { eye: 6.8, balance: 7.2, face_shape: 7.5, eye_distance: 6.5, skin: 6.8 },
-    appearance_score: { score: 72, max_score: 100 },
     grooming_keywords: ["생기있는", "동안", "활동적인", "외향적인", "유머러스한", "캐주얼"],
     radar: {
       current: { 눈매: 0.4, 코: 0.6, 얼굴윤곽: 0.55, 스타일: 0.35 },
