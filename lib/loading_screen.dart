@@ -323,16 +323,6 @@ class _LoadingScreenState extends State<LoadingScreen>
     });
   }
 
-  // 의료법 위반 가능 표현 (의료광고/시술 권유) — 응답에 1개라도 있으면 fallback
-  // 단점/약점 같은 "관찰 표현"은 컨설팅에서 정상 — banned에서 제거
-  static const List<String> _bannedWords = [
-    '필러', '보톡스', '성형', '수술', '리프팅', '레이저', '시술', '이식', '윤곽술',
-    '주사', '주입', '주입술', '교정술', '재건',
-    '처방', '치료', '진료', '임상', '의학적', '의사', '병원', '클리닉',
-    '약물', '호르몬', '진통제',
-    '못생긴', '추한', '못난',
-  ];
-
   bool _isValidResponse(Map<String, dynamic> data) {
     try {
       if (!data.containsKey('comparison') ||
@@ -378,20 +368,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         faceData: faceData,
         isPro: widget.isPro,
       );
-      // banned word 매치 확인 — 매치되면 분석 실패로 처리 (가짜 fallback 반환 X)
-      final jsonStr = jsonEncode(result);
-      final matchedWord = _bannedWords.firstWhere(
-        (w) => jsonStr.contains(w),
-        orElse: () => '',
-      );
-      if (matchedWord.isNotEmpty) {
-        debugPrint('🔴 BANNED WORD MATCHED: "$matchedWord" → 분석 실패 처리');
-        throw _AnalysisException(
-          code: 'banned_content',
-          message: 'AI 분석에 부적절한 표현이 포함됐어요. 다른 사진으로 다시 시도해주세요.',
-        );
-      }
-      debugPrint('🟢 Gemini main response OK (${jsonStr.length} chars)');
+      debugPrint('🟢 Claude main response OK (${jsonEncode(result).length} chars)');
       return result;
     } on _AnalysisException {
       rethrow;

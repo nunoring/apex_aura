@@ -70,109 +70,19 @@ class ClaudeService {
     final compressed = _compressImage(imageBytes);
     final compressedMime = 'image/jpeg'; // 압축 후 항상 JPEG
 
-    // 순차 호출 (병렬 → 순차: Anthropic 동시 호출 차단 회피)
-    // 1) 메인 분석 먼저 (필수)
-    final main = await _analyzeMain(
-      imageBytes: compressed,
-      mimeType: compressedMime,
-      animalType: animalType,
-      gender: gender,
-      faceData: faceData,
-      isPro: isPro,
-    );
-
-    // 2) 메인 끝나면 약간 대기 후 lookalike (Anthropic이 부담 못 느끼게)
-    await Future.delayed(const Duration(milliseconds: 500));
-    Map<String, dynamic> lookalikes = {};
-    try {
-      lookalikes = await _analyzeLookalikes(
-        imageBytes: compressed,
-        mimeType: compressedMime,
-        gender: gender,
-      );
-    } catch (e) {
-      debugPrint('🟡 Lookalike 실패 (메인은 OK): $e');
-      // 실패해도 메인은 보여줌
-    }
-
-    final fi = main['first_impression'] as Map<String, dynamic>?;
-    if (fi != null) {
-      if (lookalikes['lookalike_celebs'] != null) {
-        fi['lookalike_celebs'] = lookalikes['lookalike_celebs'];
-      }
-      if (lookalikes['animal_distribution'] != null) {
-        fi['animal_distribution'] = lookalikes['animal_distribution'];
-      }
-    } else {
-      main['first_impression'] = {
-        'lookalike_celebs': lookalikes['lookalike_celebs'],
-        'animal_distribution': lookalikes['animal_distribution'],
-      };
-    }
-    return main;
-  }
-
-  static Future<Map<String, dynamic>> _analyzeMain({
-    required Uint8List imageBytes,
-    required String mimeType,
-    required String animalType,
-    required String gender,
-    required Map<String, dynamic> faceData,
-    required bool isPro,
-  }) async {
+    // 1회 호출에 메인 + lookalike + animal_distribution 통합 (응답 시간 절반)
     final prompt = _buildPrompt(animalType, gender, faceData, isPro);
     return _callClaude(
       systemPrompt: _systemPrompt,
       userText: prompt,
-      imageBytes: imageBytes,
-      mimeType: mimeType,
-      maxTokens: 4096, // 8192 → 4096 (Anthropic 부하 줄임)
+      imageBytes: compressed,
+      mimeType: compressedMime,
+      maxTokens: 3072,
     );
   }
 
-  static Future<Map<String, dynamic>> _analyzeLookalikes({
-    required Uint8List imageBytes,
-    required String mimeType,
-    required String gender,
-  }) async {
-    final genderKo = gender == 'female' ? '여성' : '남성';
-    const lookalikeSystem =
-        '당신은 사진을 보고 한국 연예인 닮은꼴을 찾는 전문가입니다. JSON만 응답합니다. ```json 마크다운 금지.';
-    final prompt = '''사진의 $genderKo을 보고 다음 두 정보만 JSON으로 응답:
-
-1. 사진의 사람과 실제로 닮은 한국 $genderKo 연예인 3명 (개인 솔로/배우만, 그룹명 금지 — 위키피디아에 개인 페이지 있는 사람)
-2. 사진을 보고 판단한 동물상 분포 (강아지상/고양이상/여우상/사슴상/늑대상/토끼상/곰상 중 3개, 합 100)
-
-반드시 아래 JSON 형식으로만:
-{
-  "lookalike_celebs": [
-    {"name": "한국 연예인 이름1", "trait": "어디가 닮았는지 한 문장 (15자 이상)", "work": "대표작 또는 소속 (10자 이상)"},
-    {"name": "한국 연예인 이름2", "trait": "...", "work": "..."},
-    {"name": "한국 연예인 이름3", "trait": "...", "work": "..."}
-  ],
-  "animal_distribution": [
-    {"name": "메인동물상", "percentage": 45},
-    {"name": "보조동물상1", "percentage": 30},
-    {"name": "보조동물상2", "percentage": 25}
-  ]
-}''';
-
-    try {
-      return await _callClaude(
-        systemPrompt: lookalikeSystem,
-        userText: prompt,
-        imageBytes: imageBytes,
-        mimeType: mimeType,
-        maxTokens: 1024,
-      );
-    } catch (e) {
-      debugPrint('🟡 Claude LOOKALIKE error: $e');
-      return {};
-    }
-  }
-
-  // Claude API 호출 (HTTP REST + Vision) + 재시도 로직
-  // 529(Overloaded) / 429(Rate limit) / 5xx 시 exponential backoff 재시도
+  // Claude API 호출 (HTTP REST + Vision) — 재시도 1회 (UX 우선)
+  // timeout 25s, 429/529/5xx 시 3초 후 1회 재시도. 그 이후 즉시 실패.
   static Future<Map<String, dynamic>> _callClaude({
     required String systemPrompt,
     required String userText,
@@ -204,13 +114,7 @@ class ClaudeService {
       ],
     });
 
-    // 재시도: 1초 → 3초 (총 최대 2회 시도). UX상 너무 길지 않게.
-    const delays = [1, 3];
-    http.Response? lastRes;
-    String? lastError;
-    for (int attempt = 0; attempt < 2; attempt++) {
-      try {
-        final res = await http.post(
+    Future<http.Response> doCall() => http.post(
           uri,
           headers: {
             'x-api-key': kAnthropicApiKey,
@@ -218,50 +122,45 @@ class ClaudeService {
             'content-type': 'application/json',
           },
           body: body,
-        ).timeout(const Duration(seconds: 40)); // 호출당 최대 40초
+        ).timeout(const Duration(seconds: 25));
 
-        if (res.statusCode == 200) {
-          final response = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-          final content = response['content'] as List?;
-          if (content == null || content.isEmpty) {
-            throw Exception('Claude empty response');
-          }
-          final firstText = (content.first as Map)['text']?.toString() ?? '';
-          return _parseJson(firstText);
-        }
+    http.Response res;
+    try {
+      res = await doCall();
+    } catch (e) {
+      debugPrint('⚠️ Claude API 1차 시도 실패 (재시도 1회): $e');
+      await Future.delayed(const Duration(seconds: 3));
+      res = await doCall(); // 1회 재시도 — 또 실패 시 throw가 호출자로 전파
+    }
 
-        // 일시적 에러 (재시도 가능): 429, 5xx, 529 (Overloaded)
-        if (res.statusCode == 429 ||
-            res.statusCode == 529 ||
-            (res.statusCode >= 500 && res.statusCode < 600)) {
-          lastRes = res;
-          debugPrint('⚠️ Claude API ${res.statusCode} (재시도 ${attempt + 1}/2): 대기 ${delays[attempt]}초');
-          if (attempt < 1) {
-            await Future.delayed(Duration(seconds: delays[attempt]));
-            continue;
-          }
-        }
+    if (res.statusCode == 200) {
+      final response = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final content = response['content'] as List?;
+      if (content == null || content.isEmpty) {
+        throw Exception('Claude empty response');
+      }
+      final firstText = (content.first as Map)['text']?.toString() ?? '';
+      return _parseJson(firstText);
+    }
 
-        // 영구 에러 (4xx 등 — 재시도 의미 X)
-        throw Exception(
-            'Claude API ${res.statusCode}: ${utf8.decode(res.bodyBytes).substring(0, 200.clamp(0, res.bodyBytes.length))}');
-      } catch (e) {
-        lastError = e.toString();
-        if (e is Exception && e.toString().contains('Claude API') && !e.toString().contains('529') && !e.toString().contains('429') && !e.toString().contains('5')) {
-          rethrow; // 영구 에러는 즉시
-        }
-        if (attempt < 1) {
-          debugPrint('⚠️ Claude API 에러 (재시도 ${attempt + 1}/2): $e');
-          await Future.delayed(Duration(seconds: delays[attempt]));
-          continue;
-        }
+    // 5xx/429/529는 한 번 재시도
+    if (res.statusCode == 429 ||
+        res.statusCode == 529 ||
+        (res.statusCode >= 500 && res.statusCode < 600)) {
+      debugPrint('⚠️ Claude API ${res.statusCode}: 3초 후 1회 재시도');
+      await Future.delayed(const Duration(seconds: 3));
+      res = await doCall();
+      if (res.statusCode == 200) {
+        final response = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+        final content = response['content'] as List?;
+        final firstText = (content!.first as Map)['text']?.toString() ?? '';
+        return _parseJson(firstText);
       }
     }
-    // 2회 모두 실패
-    if (lastRes != null) {
-      throw Exception('Claude API 2회 재시도 모두 실패 (마지막: ${lastRes.statusCode}). 잠시 후 다시 시도해주세요.');
-    }
-    throw Exception('Claude API 2회 재시도 모두 실패: $lastError');
+
+    final bodyPreview = utf8.decode(res.bodyBytes);
+    final clipped = bodyPreview.substring(0, bodyPreview.length.clamp(0, 200));
+    throw Exception('Claude API ${res.statusCode}: $clipped');
   }
 
   static String _buildPrompt(
@@ -309,6 +208,10 @@ $catalogText
 ## 기타
 ※ ${gender == 'female' ? '여성이므로 메이크업 4단계 제품 추천 포함.' : '남성이므로 메이크업 대신 스킨케어+눈썹정리+헤어왁스+향수 그루밍 루틴 4단계 추천.'}
 
+## 닮은꼴 셀럽 + 동물상 분포 (필수, 누락 금지)
+※ lookalike_celebs: 사진과 실제로 닮은 한국 $genderKo 연예인 3명. 개인 솔로/배우만 (그룹명 금지). 위키피디아 개인 페이지 있는 사람.
+※ animal_distribution: 사진을 보고 직접 판단한 동물상 분포. 7종(강아지/고양이/여우/사슴/늑대/토끼/곰)상 중 3개. 합 100. 메인이 1순위로 가장 높게.
+
 $schema''';
   }
 
@@ -320,6 +223,16 @@ $schema''';
   "first_impression": {
     "summary": "첫인상 한 줄 요약 (20자 이상)",
     "face_shape": "얼굴형",
+    "lookalike_celebs": [
+      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
+      {"name": "한국 연예인 이름2", "trait": "...", "work": "..."},
+      {"name": "한국 연예인 이름3", "trait": "...", "work": "..."}
+    ],
+    "animal_distribution": [
+      {"name": "메인동물상", "percentage": 45},
+      {"name": "보조동물상1", "percentage": 30},
+      {"name": "보조동물상2", "percentage": 25}
+    ],
     "main_animal": {
       "name": "$currentAnimal",
       "emoji": "🐶",
@@ -403,6 +316,16 @@ $schema''';
   "first_impression": {
     "summary": "첫인상 한 줄 요약 (20자 이상)",
     "face_shape": "얼굴형",
+    "lookalike_celebs": [
+      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
+      {"name": "한국 연예인 이름2", "trait": "...", "work": "..."},
+      {"name": "한국 연예인 이름3", "trait": "...", "work": "..."}
+    ],
+    "animal_distribution": [
+      {"name": "메인동물상", "percentage": 45},
+      {"name": "보조동물상1", "percentage": 30},
+      {"name": "보조동물상2", "percentage": 25}
+    ],
     "main_animal": {
       "name": "$currentAnimal",
       "emoji": "🐶",
