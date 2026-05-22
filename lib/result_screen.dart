@@ -44,6 +44,7 @@ class ResultScreen extends StatefulWidget {
   final File imageFile;
   final Map<String, dynamic> faceData;
   final String gender;
+  final Future<Map<String, dynamic>>? stylingFuture;
 
   const ResultScreen({
     super.key,
@@ -53,6 +54,7 @@ class ResultScreen extends StatefulWidget {
     required this.imageFile,
     required this.faceData,
     this.gender = 'male',
+    this.stylingFuture,
   });
 
   @override
@@ -69,11 +71,52 @@ class _ResultScreenState extends State<ResultScreen> {
   bool _isPro = false;
   List<Widget> _pages = [];
   final GlobalKey _shareKey = GlobalKey();
+  bool _stylingLoading = false;
+  bool _stylingFailed = false;
+  late Map<String, dynamic> analysisResult; // mutable copy (styling 도착 시 makeup_steps/fashion_looks 추가)
 
   @override
   void initState() {
     super.initState();
+    analysisResult = Map<String, dynamic>.from(widget.analysisResult);
     _initPageFlow();
+    _awaitStyling();
+  }
+
+  // 백그라운드 styling 호출 결과 도착 시 analysisResult에 병합 + UI 재구성
+  Future<void> _awaitStyling() async {
+    if (widget.stylingFuture == null) return;
+    setState(() => _stylingLoading = true);
+    try {
+      final styling = await widget.stylingFuture!;
+      if (!mounted) return;
+      if (styling.isEmpty) {
+        setState(() {
+          _stylingLoading = false;
+          _stylingFailed = true;
+        });
+        return;
+      }
+      setState(() {
+        if (styling['makeup_steps'] != null) {
+          analysisResult['makeup_steps'] = styling['makeup_steps'];
+        }
+        if (styling['fashion_looks'] != null) {
+          analysisResult['fashion_looks'] = styling['fashion_looks'];
+        }
+        _stylingLoading = false;
+      });
+      // 페이지 다시 빌드 (Pro 페이지에 데이터 반영)
+      _initPageFlow();
+    } catch (e) {
+      debugPrint('🟡 styling 결과 처리 실패: $e');
+      if (mounted) {
+        setState(() {
+          _stylingLoading = false;
+          _stylingFailed = true;
+        });
+      }
+    }
   }
 
   Future<void> _initPageFlow() async {
@@ -258,7 +301,33 @@ class _ResultScreenState extends State<ResultScreen> {
             ),
           const SizedBox(height: 10),
 
-          if (targetA != null)
+          if (targetA != null) ...[
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1500),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFE8A030).withAlpha(80), width: 0.5),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.auto_awesome, size: 11, color: Color(0xFFE8A030)),
+                      SizedBox(width: 4),
+                      Text('AI 추천 변신 방향',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFFE8A030),
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             TargetAnimalCard(
               name: targetA['name']?.toString() ?? '',
               emoji: targetA['emoji']?.toString() ?? '',
@@ -266,12 +335,11 @@ class _ResultScreenState extends State<ResultScreen> {
               comment: targetA['comment']?.toString() ?? '',
               imagePath: _animalImgPath(targetA['name']?.toString() ?? ''),
             ),
+          ],
           const SizedBox(height: 16),
           // 셀럽 닮은꼴
           _buildCelebMatchSection(),
-          const SizedBox(height: 20),
-          // 컨설팅 톤 — 단점 + 비의료 보완책 (Free는 블러)
-          _buildWeaknessSection(),
+          // 컨설팅 부분(weaknesses)은 Page 4 (3박자 솔루션)으로 이동
         ],
       ),
     );
@@ -534,10 +602,14 @@ class _ResultScreenState extends State<ResultScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('3박자 솔루션', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
+          const Text('컨설팅 리포트', style: TextStyle(fontSize: 14, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          const Text('신체관리 · 얼굴관리 · 패션', style: TextStyle(fontSize: 11, color: Color(0xFF555555))),
+          const Text('단점 · 비의료 솔루션 · 액션카드', style: TextStyle(fontSize: 11, color: Color(0xFF555555))),
           const SizedBox(height: 16),
+
+          // 컨설팅 본론 (Page 2에서 이동) — 단점 + 비의료 보완책
+          _buildWeaknessSection(),
+          const SizedBox(height: 20),
 
           if (threeFactor != null) ...[
             _iconThreeFactorCard(
@@ -583,6 +655,89 @@ class _ResultScreenState extends State<ResultScreen> {
                       '',
                   refName: refName,
                   refContext: refContext,
+                ),
+              );
+            }),
+            // 후킹: gap_reduction 합산 배너 — "단 N가지로 +M% 갭 축소"
+            Builder(builder: (context) {
+              final totalGap = actionCards.fold<int>(0, (sum, card) {
+                final c = card as Map<String, dynamic>;
+                final gr = (c['gap_reduction'] as num?)?.toInt() ?? 0;
+                return sum + gr;
+              });
+              if (totalGap <= 0) return const SizedBox.shrink();
+              final tier = analysisResult['first_impression']?['appearance_tier']
+                  as Map<String, dynamic>?;
+              final abovePct = (tier?['above_percentile'] as num?)?.toInt();
+              final targetPct = (tier?['target_percentile'] as num?)?.toInt();
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFE8A030).withAlpha(40),
+                        const Color(0xFFE8A030).withAlpha(15),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFE8A030).withAlpha(120),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.bolt, size: 14, color: Color(0xFFE8A030)),
+                          const SizedBox(width: 4),
+                          Text('단 ${actionCards.length}가지 변화로',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFFE8A030),
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontSize: 18, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w900),
+                          children: [
+                            const TextSpan(text: '갭 '),
+                            TextSpan(
+                              text: '$totalGap%',
+                              style: const TextStyle(
+                                  fontSize: 22, color: Color(0xFFE8A030),
+                                  fontWeight: FontWeight.w900),
+                            ),
+                            const TextSpan(text: ' 축소'),
+                            if (abovePct != null && targetPct != null) ...[
+                              const TextSpan(
+                                text: '  ·  ',
+                                style: TextStyle(fontSize: 14, color: Color(0xFF555544)),
+                              ),
+                              TextSpan(
+                                text: '상위 $abovePct%',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF888866), fontWeight: FontWeight.w600),
+                              ),
+                              const TextSpan(
+                                text: ' → ',
+                                style: TextStyle(fontSize: 14, color: Color(0xFFE8A030)),
+                              ),
+                              TextSpan(
+                                text: '$targetPct%',
+                                style: const TextStyle(fontSize: 16, color: Color(0xFFE8A030), fontWeight: FontWeight.w900),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),
@@ -660,29 +815,33 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   // Unsplash 이미지 헬퍼 (패션/메이크업 키워드 매칭)
-  Widget _unsplashImage(String query, {double width = 120, double height = 140}) {
+  Widget _unsplashImage(String query, {double width = 120, double height = 140, BoxFit fit = BoxFit.cover}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: FutureBuilder<String?>(
-        future: UnsplashService.fetchImageUrl(query),
-        builder: (context, snapshot) {
-          final url = snapshot.data;
-          Widget ph = Container(
-            width: width, height: height,
-            color: const Color(0xFF1A1A1A),
-            alignment: Alignment.center,
-            child: snapshot.connectionState == ConnectionState.waiting
-                ? const SizedBox(
-                    width: 14, height: 14,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 1.5, color: Color(0xFF555555)))
-                : const Icon(Icons.image_outlined, size: 18, color: Color(0xFF444444)),
-          );
-          if (url == null || url.isEmpty) return ph;
-          return Image.network(url,
-              width: width, height: height, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => ph);
-        },
+      child: Container(
+        width: width, height: height,
+        color: const Color(0xFF1A1A1A),
+        child: FutureBuilder<String?>(
+          future: UnsplashService.fetchImageUrl(query),
+          builder: (context, snapshot) {
+            final url = snapshot.data;
+            Widget ph = Container(
+              width: width, height: height,
+              color: const Color(0xFF1A1A1A),
+              alignment: Alignment.center,
+              child: snapshot.connectionState == ConnectionState.waiting
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1.5, color: Color(0xFF555555)))
+                  : const Icon(Icons.image_outlined, size: 18, color: Color(0xFF444444)),
+            );
+            if (url == null || url.isEmpty) return ph;
+            return Image.network(url,
+                width: width, height: height, fit: fit,
+                errorBuilder: (_, __, ___) => ph);
+          },
+        ),
       ),
     );
   }
@@ -847,16 +1006,7 @@ class _ResultScreenState extends State<ResultScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Unsplash 단계 이미지 (전폭)
-                    if (stepName.isNotEmpty) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        height: 120,
-                        child: _unsplashImage(_makeupKeyword(stepName),
-                            width: double.infinity, height: 120),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
+                    // 메이크업 단계 이미지 제거 (Unsplash 매칭 부정확)
                     Row(children: [
                       Container(
                         width: 24, height: 24,
@@ -974,12 +1124,12 @@ class _ResultScreenState extends State<ResultScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Unsplash 패션 룩 이미지 (전폭, 큰 사이즈)
+                  // Unsplash 패션 룩 이미지 (단품/플랫레이, 잘림 방지 contain)
                   SizedBox(
                     width: double.infinity,
-                    height: 320,
+                    height: 200,
                     child: _unsplashImage(fashionKeyword,
-                        width: double.infinity, height: 320),
+                        width: double.infinity, height: 200, fit: BoxFit.contain),
                   ),
                   const SizedBox(height: 12),
                   Text(lookName,
@@ -2006,7 +2156,6 @@ class _ResultScreenState extends State<ResultScreen> {
 
   String get animalType => widget.animalType;
   double get sliderValue => widget.sliderValue;
-  Map<String, dynamic> get analysisResult => widget.analysisResult;
   File get imageFile => widget.imageFile;
   Map<String, dynamic> get faceData => widget.faceData;
 
@@ -2602,45 +2751,82 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(height: 4),
           Text(s.tagline,
               style: TextStyle(fontSize: 11, color: s.tierColor.withAlpha(180), height: 1.4)),
-          // AI 등급 표시 (Gemini appearance_tier — 1~10 + tier_name)
+          // AI 등급 표시 (appearance_tier — 1~10 + target_score 후킹)
           Builder(builder: (context) {
             final tier = analysisResult['first_impression']?['appearance_tier']
                 as Map<String, dynamic>?;
             if (tier == null) return const SizedBox.shrink();
             final score10 = (tier['score'] as num?)?.toInt();
             final tierName = tier['tier_name']?.toString() ?? '';
+            final targetScore = (tier['target_score'] as num?)?.toInt();
+            final targetPercentile = (tier['target_percentile'] as num?)?.toInt();
+            final abovePct = (tier['above_percentile'] as num?)?.toInt();
             if (score10 == null || tierName.isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1A1500),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFE8A030).withAlpha(60), width: 0.5),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('AI 등급 ',
-                        style: const TextStyle(fontSize: 10, color: Color(0xFF888866))),
-                    Text('$score10',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w900,
-                            color: Color(0xFFE8A030))),
-                    const Text(' / 10',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF666644))),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 1, height: 14,
-                      color: const Color(0xFF333322),
+                    Row(
+                      children: [
+                        const Text('AI 등급 ',
+                            style: TextStyle(fontSize: 10, color: Color(0xFF888866))),
+                        Text('$score10',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w900,
+                                color: Color(0xFFE8A030))),
+                        const Text(' / 10',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF666644))),
+                        const SizedBox(width: 10),
+                        Container(width: 1, height: 14, color: const Color(0xFF333322)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(tierName,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFFE8D5B7),
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(tierName,
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFFE8D5B7),
-                              fontWeight: FontWeight.w600)),
-                    ),
+                    if (targetScore != null && targetScore > score10) ...[
+                      const SizedBox(height: 8),
+                      Container(height: 0.5, color: const Color(0xFF332C00)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome, size: 11, color: Color(0xFFE8A030)),
+                          const SizedBox(width: 4),
+                          const Text('변화 시 ',
+                              style: TextStyle(fontSize: 10, color: Color(0xFF888866))),
+                          Text('$score10',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF666644),
+                                  fontWeight: FontWeight.w600)),
+                          const Text(' → ',
+                              style: TextStyle(fontSize: 12, color: Color(0xFFE8A030))),
+                          Text('$targetScore',
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w900,
+                                  color: Color(0xFFE8A030))),
+                          const Text(' 점',
+                              style: TextStyle(fontSize: 10, color: Color(0xFF888866))),
+                          if (targetPercentile != null && abovePct != null) ...[
+                            const Spacer(),
+                            Text('상위 $abovePct% → $targetPercentile%',
+                                style: const TextStyle(
+                                    fontSize: 10, color: Color(0xFFE8A030),
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

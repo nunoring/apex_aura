@@ -10,16 +10,14 @@ import '../config.dart';
 // 외모 분석 1등 모델. Gemini 대비 content filter 약함 + 디테일 풍부.
 class ClaudeService {
   static const _systemPrompt =
-      '당신은 1회 컨설팅비 30만원의 외모 컨설턴트입니다. '
-      '실제 1:1 컨설팅 자료 수준의 깊이로 분석합니다. '
-      '톤: 직설적 + 전문가 권위 + 단점 명시 + 즉시 실행 가능한 솔루션. '
-      '예시: "둥근~하트형 얼굴형. 하안부가 큰 편 → 시선이 집중되어 단점이 도드라짐. '
-      '솔루션: 외곽 라인 정리 헤어 + 광대 강조 메이크업으로 시선 분산." '
-      '위로형/모호한 표현 ("자연스러워요", "친근해요" 단독 사용 X). '
-      '솔루션은 비의료 그루밍 (헤어 / 메이크업 / 패션 / 액세서리 / 스킨케어) 만 제시. '
-      '의료 행위 권유 절대 금지 — 병원·클리닉 추천 금지, 약물 추천 금지. '
-      '얼굴 평가는 인상/비율 관찰까지만, 미적 우열 판단 금지. '
-      '모든 응답은 반드시 JSON만, 다른 텍스트 없이 반환합니다. JSON 앞뒤에 ```json 같은 마크다운 절대 금지.';
+      '당신은 1회 30만원 외모 컨설턴트입니다. '
+      '톤: 직설적 + 단점 명시 + 비의료 솔루션 (헤어/메이크업/패션/그루밍). '
+      '위로형 표현("자연스럽다", "친근하다") 금지. 의료 권유 금지 (병원/클리닉/약물 X). '
+      '얼굴 미적 우열 판단 금지, 비율/인상 관찰까지만. '
+      '핵심 필드(description, observation, impact, solution, application)는 풍부하게 80~120자. '
+      '기타 필드(keywords, tip, comment)는 짧게 30자 이내. '
+      'JSON 응답 전체 3500자 이내로 유지 (한도 초과 시 잘림). '
+      '응답은 JSON만, 마크다운 백틱 절대 금지.';
 
   static const _animalCatalog = [
     {'name': '강아지상', 'emoji': '🐶', 'keywords': ['부드러움', '친근함', '자연스러움']},
@@ -30,6 +28,65 @@ class ClaudeService {
     {'name': '토끼상', 'emoji': '🐰', 'keywords': ['귀여움', '발랄함', '동안']},
     {'name': '곰상', 'emoji': '🐻', 'keywords': ['듬직함', '편안함', '포근함']},
   ];
+
+  // 외모 컨설팅 도구 박스 — Claude가 측정 기준 + 분류 도구로 활용
+  static const _consultingFramework = '''
+## 외모 컨설팅 도구 박스 (분석 시 적극 활용)
+
+### 얼굴 비율 측정 기준
+- 삼정비 (이상): 상안부(이마):중안부(눈~코):하안부(인중~턱) = 1:1:1
+- 황금비: 얼굴 가로:세로 = 1:1.618 (계란형 기준)
+- 광대 적정 위치: 눈동자 아래 약 2cm
+- 턱선 곡률: 30~45도가 부드러움 (각진 < 30 = 강함, > 45 = 무력)
+- 눈 사이: 한 눈 너비 = 적정 (좁으면 답답, 넓으면 어색)
+
+### 한국 남성 헤어 5분류
+1. 댄디컷 — 옆머리 짧고 윗머리 자연 정리. 클래식 인상.
+2. 투블럭 — 옆머리 짧고 윗머리 길게. 트렌디 + 강한 인상.
+3. 가르마 (Side part) — 옆 가르마로 윗머리 흐름. 정장/오피스.
+4. 리프컷 (펌 포함) — 윗머리 볼륨 + 부드러운 컬. 동안 효과.
+5. 쉐도우펌/물결펌 — 자연스러운 컬로 부피감. 페미닌 인상.
+
+### 한국 여성 헤어 5분류
+1. 단발 (보브) — 어깨 위 깔끔. 청량/도회적.
+2. 미디움 레이어드 — 어깨선 + 레이어. 가장 무난.
+3. 롱헤어 + 시스루 뱅 — 청순/동안.
+4. 사이드 펌 + 미디움 — 우아/성숙.
+5. 숏컷 — 시크/모던.
+
+### 컬러 시즌 4분류
+- Spring Warm: 노란 베이스 밝은 톤 (코랄, 피치, 라이트 베이지)
+- Summer Cool: 푸른 베이스 부드러운 톤 (로즈, 라일락, 그레이)
+- Autumn Warm: 노란 베이스 깊은 톤 (테라코타, 카멜, 올리브)
+- Winter Cool: 푸른 베이스 강한 톤 (블랙, 와인, 쨍한 화이트)
+
+### K-뷰티 메이크업 4단계 공식 (여성)
+1. 베이스 — 스킨/메이크업 베이스 + 톤 보정. 광채감 (글로우 vs 매트)
+2. 광채/음영 — 컨실러 + 하이라이터 + 쉐딩으로 입체감
+3. 포인트 — 눈썹 + 아이라이너 + 마스카라 + 블러셔 (시즌 컬러 매칭)
+4. 마무리 — 립 + 픽서 스프레이 (지속력)
+
+### 남성 그루밍 4단계 공식
+1. 스킨케어 — 세안 + 토너 + 수분크림. 결 정돈 = 인상 +20%
+2. 눈썹 정리 — 모양 잡기 + 빈 곳 채우기. 인상 좌우 큰 변수
+3. 헤어 — 왁스 + 드라이로 윗머리 볼륨 (위 5분류 활용)
+4. 향수 — 시트러스/우디/머스크. 깔끔한 인상 마무리
+
+### 패션 실루엣 5분류
+- 클래식 — 정장, 핏 강조, 무채색
+- 캐주얼 — 데님, 티셔츠, 스니커즈
+- 모던/미니멀 — 단색, 슬림 핏, 절제
+- 스트릿 — 오버사이즈, 그래픽, 컬러 포인트
+- 빈티지 — 70~90s 레퍼런스, 레트로 패턴
+
+## 한국 셀럽 레퍼런스 카탈로그 (위키피디아 페이지 있는 개인만)
+
+### 남성 배우/가수 (15명) — 이름:스타일키워드
+박서준:자연스러운 댄디 / 차은우:정제된 미소년 / 이종석:시크 슬림 / 박보검:부드러운 그루밍 / 김수현:다정한 동안 / 송중기:단정한 클래식 / 정우성:강렬한 마초 / 공유:무게감 시크 / 조정석:친근한 캐주얼 / 류준열:자연스러운 빈티지 / 정해인:깔끔한 청량 / 변우석:트렌디 모던 / 박형식:부드러운 동안 / 임시완:단아한 학생 / 진영:정제된 미소년
+
+### 여성 배우/가수 (15명) — 이름:스타일키워드
+김다미:청량 스트릿 / 김태리:단아한 청순 / 수지:풋풋한 자연 미인 / 한지민:우아한 럭셔리 / 박소담:시크 모던 / 김유정:청량 동안 / 김혜윤:발랄 청춘 / 신민아:도시적 시크 / 박보영:사랑스러운 동안 / 한효주:우아한 클래식 / 정유미:자연스러운 빈티지 / 김태희:차분한 럭셔리 / 손예진:우아한 청순 / 송혜교:깔끔한 단정 / 박신혜:발랄한 동안
+''';
 
   // 이미지 리사이즈 + 압축 (Anthropic API 처리 부담 줄임)
   // 셀카 5~10MB → 1024px × JPEG 85% ≈ 150~300KB → 처리 안정/빠름
@@ -58,7 +115,9 @@ class ClaudeService {
     }
   }
 
-  static Future<Map<String, dynamic>> analyze({
+  // 메인 분석 (1차 호출) — 화면 진입 차단 필수 콘텐츠
+  // first_impression + comparison + consultant_report + action_cards
+  static Future<Map<String, dynamic>> analyzeMain({
     required Uint8List imageBytes,
     required String mimeType,
     required String animalType,
@@ -66,23 +125,43 @@ class ClaudeService {
     required Map<String, dynamic> faceData,
     required bool isPro,
   }) async {
-    // 이미지 압축 (Claude API 처리 부담 줄이려면 1MB 이하 권장)
     final compressed = _compressImage(imageBytes);
-    final compressedMime = 'image/jpeg'; // 압축 후 항상 JPEG
-
-    // 1회 호출에 메인 + lookalike + animal_distribution 통합 (응답 시간 절반)
-    final prompt = _buildPrompt(animalType, gender, faceData, isPro);
+    final prompt = _buildMainPrompt(animalType, gender, faceData, isPro);
     return _callClaude(
       systemPrompt: _systemPrompt,
       userText: prompt,
       imageBytes: compressed,
-      mimeType: compressedMime,
-      maxTokens: 3072,
+      mimeType: 'image/jpeg',
+      maxTokens: 4096,
     );
   }
 
-  // Claude API 호출 (HTTP REST + Vision) — 재시도 1회 (UX 우선)
-  // timeout 25s, 429/529/5xx 시 3초 후 1회 재시도. 그 이후 즉시 실패.
+  // 스타일링 분석 (2차 호출, Pro 전용) — 백그라운드로 makeup_steps + fashion_looks
+  static Future<Map<String, dynamic>> analyzeStyling({
+    required Uint8List imageBytes,
+    required String mimeType,
+    required String gender,
+    required Map<String, dynamic> faceData,
+  }) async {
+    final compressed = _compressImage(imageBytes);
+    final prompt = _buildStylingPrompt(gender, faceData);
+    return _callClaude(
+      systemPrompt: _stylingSystemPrompt,
+      userText: prompt,
+      imageBytes: compressed,
+      mimeType: 'image/jpeg',
+      maxTokens: 2048,
+    );
+  }
+
+  // styling용 system prompt (메인보다 더 단순)
+  static const _stylingSystemPrompt =
+      '당신은 스타일링 컨설턴트입니다. '
+      '메이크업/패션 추천만 짧고 핵심만 JSON으로 응답. '
+      '의료 권유 금지. 마크다운 백틱 금지.';
+
+  // Claude API 호출 (HTTP REST + Vision)
+  // timeout 40s, 재시도 없음 (빠른 실패 우선). 응답 도착 평균 25~35s.
   static Future<Map<String, dynamic>> _callClaude({
     required String systemPrompt,
     required String userText,
@@ -114,48 +193,29 @@ class ClaudeService {
       ],
     });
 
-    Future<http.Response> doCall() => http.post(
-          uri,
-          headers: {
-            'x-api-key': kAnthropicApiKey,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-          body: body,
-        ).timeout(const Duration(seconds: 25));
-
-    http.Response res;
-    try {
-      res = await doCall();
-    } catch (e) {
-      debugPrint('⚠️ Claude API 1차 시도 실패 (재시도 1회): $e');
-      await Future.delayed(const Duration(seconds: 3));
-      res = await doCall(); // 1회 재시도 — 또 실패 시 throw가 호출자로 전파
-    }
+    final sw = Stopwatch()..start();
+    final res = await http.post(
+      uri,
+      headers: {
+        'x-api-key': kAnthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: body,
+    ).timeout(const Duration(seconds: 50));
+    sw.stop();
+    debugPrint('⏱️ Claude API 응답 ${sw.elapsedMilliseconds}ms (status ${res.statusCode})');
 
     if (res.statusCode == 200) {
       final response = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      debugPrint('📦 Claude stop_reason=${response['stop_reason']} usage=${response['usage']}');
       final content = response['content'] as List?;
       if (content == null || content.isEmpty) {
         throw Exception('Claude empty response');
       }
       final firstText = (content.first as Map)['text']?.toString() ?? '';
+      debugPrint('📝 Claude text length: ${firstText.length} chars');
       return _parseJson(firstText);
-    }
-
-    // 5xx/429/529는 한 번 재시도
-    if (res.statusCode == 429 ||
-        res.statusCode == 529 ||
-        (res.statusCode >= 500 && res.statusCode < 600)) {
-      debugPrint('⚠️ Claude API ${res.statusCode}: 3초 후 1회 재시도');
-      await Future.delayed(const Duration(seconds: 3));
-      res = await doCall();
-      if (res.statusCode == 200) {
-        final response = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-        final content = response['content'] as List?;
-        final firstText = (content!.first as Map)['text']?.toString() ?? '';
-        return _parseJson(firstText);
-      }
     }
 
     final bodyPreview = utf8.decode(res.bodyBytes);
@@ -163,7 +223,8 @@ class ClaudeService {
     throw Exception('Claude API ${res.statusCode}: $clipped');
   }
 
-  static String _buildPrompt(
+  // 메인 prompt — first_impression + action_cards + consultant_report (makeup/fashion 제외)
+  static String _buildMainPrompt(
     String animalType,
     String gender,
     Map<String, dynamic> faceData,
@@ -174,45 +235,60 @@ class ClaudeService {
     final eyeAngle = faceData['eye_angle'] ?? 0;
     final eyeAngleDesc = faceData['eye_angle_desc'] ?? '수평';
     final faceShape = faceData['face_shape'] ?? '계란형';
-    final eyeGapDesc = faceData['eye_gap_desc'] ?? '보통';
 
-    final catalogText = _animalCatalog
-        .map((a) => "${a['name']} ${a['emoji']} — ${(a['keywords'] as List).join(', ')}")
-        .join('\n');
+    final schema = isPro ? _proMainSchema(animalType, currentFaceType) : _freeSchema(animalType, currentFaceType);
 
-    final schema = isPro ? _proSchema(animalType, currentFaceType) : _freeSchema(animalType, currentFaceType);
+    return '''사진 속 $genderKo의 외모를 직설적으로 분석. 톤: 단점 명시 + 비의료 솔루션.
+참고: 눈꼬리 ${eyeAngle}° ($eyeAngleDesc), 얼굴형 $faceShape, ML Kit 판정 $currentFaceType.
 
-    return '''당신은 1:1 외모 컨설팅을 수행하는 전문가입니다. 30만원 상당의 컨설팅 자료 수준의 깊이로 분석해주세요.
+$_consultingFramework
 
-## 참고 데이터
-- 성별: $genderKo
-- 눈꼬리: ${eyeAngle}° ($eyeAngleDesc), 얼굴형: $faceShape, 눈간격: $eyeGapDesc
-- 현재 동물상 (ML Kit 자동 판정): $currentFaceType
-
-## 동물상 카탈로그
-$catalogText
-
-## 컨설팅 톤 (필수)
-※ **직설적 + 전문가 권위 + 단점 명시 + 즉시 실행 가능한 솔루션**.
-※ 예시: "둥근~하트형 얼굴형. 이상적 가로~세로 비율이지만, 하안부가 큰 편 → 시선이 집중되어 하관이 도드라지는 단점. 솔루션: 외곽 라인 정리 헤어 + 광대 강조 메이크업으로 시선 분산."
-※ 단점은 반드시 명시하되, **비의료 보완책**(헤어/메이크업/패션/그루밍)을 함께 제시.
-
-## 콘텐츠 가이드
-※ target_animal(변신 추천)은 자유 선택.
-※ references의 셀럽은 **위키피디아 개인 페이지 있는 솔로 배우 또는 단독 활동 가수**. 그룹 이름 절대 금지.
-
-## 솔루션 가이드
-※ 솔루션은 비의료 그루밍만: 헤어 / 메이크업 / 안경테 / 옷 실루엣 / 액세서리 / 스킨케어.
-※ 병원·클리닉 추천 금지. 약물 추천 금지.
-
-## 기타
-※ ${gender == 'female' ? '여성이므로 메이크업 4단계 제품 추천 포함.' : '남성이므로 메이크업 대신 스킨케어+눈썹정리+헤어왁스+향수 그루밍 루틴 4단계 추천.'}
-
-## 닮은꼴 셀럽 + 동물상 분포 (필수, 누락 금지)
-※ lookalike_celebs: 사진과 실제로 닮은 한국 $genderKo 연예인 3명. 개인 솔로/배우만 (그룹명 금지). 위키피디아 개인 페이지 있는 사람.
-※ animal_distribution: 사진을 보고 직접 판단한 동물상 분포. 7종(강아지/고양이/여우/사슴/늑대/토끼/곰)상 중 3개. 합 100. 메인이 1순위로 가장 높게.
+## 분석 규칙
+- weaknesses/strengths/action_cards 작성 시 위 "외모 컨설팅 도구 박스" 적극 활용.
+  - 예: "삼정비 1:1:1.2 → 하안부 과대 → 외곽 정리 헤어로 시선 분산"
+  - 예: "여름 쿨 톤 → 베이스 메이크업은 로즈 베이지 권장"
+  - 예: "투블럭 + 윗머리 볼륨 (박서준 이태원클라쓰 헤어)"
+- references 셀럽: 위 한국 셀럽 카탈로그에서 선택 (성별/스타일 매칭). 그룹명 금지.
+- lookalike_celebs: 사진과 실제 닮은 한국 $genderKo 연예인 3명. 카탈로그 안 인물 우선.
+- animal_distribution: 7동물상 중 3개, 합 100. 메인 1순위.
+- 솔루션: 헤어/메이크업/패션/그루밍/스킨케어. 병원/클리닉/약물 금지.
 
 $schema''';
+  }
+
+  // 스타일링 prompt — makeup_steps + fashion_looks만
+  static String _buildStylingPrompt(String gender, Map<String, dynamic> faceData) {
+    final genderKo = gender == 'female' ? '여성' : '남성';
+    final faceShape = faceData['face_shape'] ?? '계란형';
+
+    return '''사진 속 $genderKo(얼굴형 $faceShape) 기준 스타일링 추천. 메이크업 2단계 + 패션 룩 2개.
+
+## 도구 박스 (적극 활용)
+### 컬러 시즌 4분류
+- Spring Warm: 코랄, 피치, 라이트 베이지
+- Summer Cool: 로즈, 라일락, 그레이
+- Autumn Warm: 테라코타, 카멜, 올리브
+- Winter Cool: 블랙, 와인, 쨍한 화이트
+
+### ${gender == 'female' ? 'K-뷰티 메이크업 2단계 공식 (여성)' : '남성 그루밍·메이크업 2단계 공식'}
+${gender == 'female' ? '''- 베이스: 스킨/메이크업 베이스 + 톤 보정 (글로우 vs 매트), 컨실러+하이라이터+쉐딩
+- 포인트: 아이브로우 + 아이라이너 + 마스카라 + 블러셔 + 립 (시즌 컬러 매칭)''' : '''- 베이스(그루밍+가벼운 화장): 세안+토너+수분크림 → BB크림 또는 톤업크림으로 피부톤 균일화 (남성용 라인 추천, 자연스럽게)
+- 포인트: 눈썹 정리 + 가벼운 컨실러 (다크서클·잡티) + 헤어 왁스 + 향수
+- 남성도 가벼운 화장 OK (BB/톤업/컨실러). 의료/시술 X.'''}
+
+### 패션 실루엣 5분류
+- 클래식 / 캐주얼 / 모던 / 스트릿 / 빈티지
+
+## 패션 룩 작성 규칙 (중요)
+- fashion_looks 2개 작성 (서로 다른 컨셉, 예: 데일리 캐주얼 + 정장/세미포멀)
+- 각 룩의 rationale에는 **"왜 이 사람에게 어울리는가"** 명시:
+  - 얼굴형($faceShape)과의 조합 이유
+  - 체형/인상과의 매칭 근거
+  - 컬러 시즌과 톤 매칭 설명
+  - 예: "각진 턱선을 부드럽게 하는 라운드 넥 + 차분한 회색은 강한 인상 완화. Summer Cool 톤이라 그레이/네이비 무채색이 피부톤 살림."
+- items 각자 rationale에 "왜 이 아이템인지" 단순한 한 줄
+
+${_stylingSchema()}''';
   }
 
   // _freeSchema와 _proSchema는 GeminiService와 동일한 응답 스키마 사용
@@ -221,10 +297,10 @@ $schema''';
 
 {
   "first_impression": {
-    "summary": "첫인상 한 줄 요약 (20자 이상)",
+    "summary": "첫인상 한 줄 요약",
     "face_shape": "얼굴형",
     "lookalike_celebs": [
-      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
+      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지", "work": "대표작/소속"},
       {"name": "한국 연예인 이름2", "trait": "...", "work": "..."},
       {"name": "한국 연예인 이름3", "trait": "...", "work": "..."}
     ],
@@ -238,17 +314,17 @@ $schema''';
       "emoji": "🐶",
       "keywords": ["키워드1", "키워드2", "키워드3"],
       "strengths": [
-        {"title": "강점1", "description": "30자 이상 설명"},
-        {"title": "강점2", "description": "30자 이상 설명"},
-        {"title": "강점3", "description": "30자 이상 설명"}
+        {"title": "강점1", "description": "짧은 설명"},
+        {"title": "강점2", "description": "짧은 설명"},
+        {"title": "강점3", "description": "짧은 설명"}
       ],
-      "tip": "이 매력을 살리는 스타일링 팁 (30자 이상)"
+      "tip": "이 매력을 살리는 스타일링 팁"
     },
-    "sub_animal": {"name": "보조동물상", "emoji": "🐱", "keywords": ["키워드1", "키워드2"], "comment": "30자 이상 설명"},
+    "sub_animal": {"name": "보조동물상", "emoji": "🐱", "keywords": ["키워드1", "키워드2"], "comment": "짧은 설명"},
     "target_animal": {"name": "추천 변신 동물상 (자유 선택, 동물상 카탈로그 중 하나)", "emoji": "이모지", "keywords": ["키워드1", "키워드2"], "comment": "20자 이상 설명"},
     "animal_match": {
       "percentage": 80,
-      "similarity_points": ["닮은 점 1 (30자 이상)", "닮은 점 2 (30자 이상)", "닮은 점 3 (30자 이상)"]
+      "similarity_points": ["닮은 점 1", "닮은 점 2", "닮은 점 3"]
     },
     "appearance_tier": {
       "score": 7,
@@ -257,7 +333,7 @@ $schema''';
       "above_percentile": 25
     },
     "weaknesses": [
-      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰 (25자 이상)", "impact": "인상 영향 (20자 이상)", "solution": "비의료 보완책 (30자 이상)"},
+      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰", "impact": "인상 영향", "solution": "비의료 보완책"},
       {"title": "단점2", "observation": "...", "impact": "...", "solution": "..."},
       {"title": "단점3", "observation": "...", "impact": "...", "solution": "..."}
     ]
@@ -270,54 +346,54 @@ $schema''';
     "gap_percent": 45
   },
   "consultant_report_simple": {
-    "quote": "전문가 코멘트 (20자 이상)",
+    "quote": "전문가 코멘트",
     "gap": "핵심 갭 요소",
     "direction": "변화 방향"
   },
   "action_cards": [
     {
       "category": "헤어스타일",
-      "observation": "현재 헤어 상태 (40자 이상)",
-      "impact": "인상에 미치는 영향 (30자 이상)",
-      "change": "개선 방법 (30자 이상)",
-      "result": "변화 후 인상 (30자 이상)",
+      "observation": "현재 헤어 상태",
+      "impact": "인상에 미치는 영향",
+      "change": "개선 방법",
+      "result": "변화 후 인상",
       "application": "관찰→영향→변화→결과 연결 설명. 120자 이상.",
       "timeline": "오늘 가능",
       "gap_reduction": 15,
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유", "description": "스타일 요소"}]
     },
     {
       "category": "패션",
-      "observation": "현재 패션 상태 (40자 이상)",
-      "impact": "인상에 미치는 영향 (30자 이상)",
-      "change": "개선 방법 (30자 이상)",
-      "result": "변화 후 인상 (30자 이상)",
-      "application": "120자 이상.",
+      "observation": "현재 패션 상태",
+      "impact": "인상에 미치는 영향",
+      "change": "개선 방법",
+      "result": "변화 후 인상",
+      "application": "관찰→영향→변화→결과 연결 설명",
       "timeline": "1주일",
       "gap_reduction": 20,
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유", "description": "스타일 요소"}]
     },
     {
       "category": "그루밍",
-      "observation": "현재 그루밍 상태 (40자 이상)",
-      "impact": "인상에 미치는 영향 (30자 이상)",
-      "change": "개선 방법 (30자 이상)",
-      "result": "변화 후 인상 (30자 이상)",
-      "application": "120자 이상.",
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "observation": "현재 그루밍 상태",
+      "impact": "인상에 미치는 영향",
+      "change": "개선 방법",
+      "result": "변화 후 인상",
+      "application": "관찰→영향→변화→결과 연결 설명",
+      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유", "description": "스타일 요소"}]
     }
   ]
 }''';
 
-  static String _proSchema(String targetAnimal, String currentAnimal) => '''
+  static String _proMainSchema(String targetAnimal, String currentAnimal) => '''
 반드시 아래 JSON 형식으로만 응답:
 
 {
   "first_impression": {
-    "summary": "첫인상 한 줄 요약 (20자 이상)",
+    "summary": "첫인상 한 줄 요약",
     "face_shape": "얼굴형",
     "lookalike_celebs": [
-      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
+      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지", "work": "대표작/소속"},
       {"name": "한국 연예인 이름2", "trait": "...", "work": "..."},
       {"name": "한국 연예인 이름3", "trait": "...", "work": "..."}
     ],
@@ -329,37 +405,34 @@ $schema''';
     "main_animal": {
       "name": "$currentAnimal",
       "emoji": "🐶",
-      "keywords": ["키워드1", "키워드2", "키워드3"],
+      "keywords": ["k1", "k2", "k3"],
       "strengths": [
-        {"title": "강점1", "description": "30자 이상 설명"},
-        {"title": "강점2", "description": "30자 이상 설명"},
-        {"title": "강점3", "description": "30자 이상 설명"}
+        {"title": "강점1", "description": "이 매력이 인상에 미치는 영향을 자세히 (80자+)"},
+        {"title": "강점2", "description": "자세히 (80자+)"},
+        {"title": "강점3", "description": "자세히 (80자+)"}
       ],
-      "tip": "스타일링 팁 (30자 이상)"
+      "tip": "이 매력을 살리는 구체 스타일링 팁"
     },
-    "sub_animal": {"name": "보조동물상", "emoji": "🐱", "keywords": ["키워드1", "키워드2"], "comment": "30자 이상"},
-    "target_animal": {"name": "추천 변신 동물상 (자유 선택)", "emoji": "이모지", "keywords": ["키워드1", "키워드2"], "comment": "20자 이상"},
+    "sub_animal": {"name": "보조동물상", "emoji": "🐱", "keywords": ["k1", "k2"], "comment": "보조 매력 자세히 (60자+)"},
+    "target_animal": {"name": "추천 변신 동물상", "emoji": "이모지", "keywords": ["k1", "k2"], "comment": "왜 이 방향인지 (50자+)"},
     "animal_match": {
       "main": "$currentAnimal",
       "percentage": 80,
-      "reasons": ["근거1 (40자 이상)", "근거2 (40자 이상)", "근거3 (40자 이상)"],
-      "gap_to_target": {
-        "target_animal": "$targetAnimal",
-        "changeable": ["바꿀 수 있는 요소1", "바꿀 수 있는 요소2"],
-        "fixed": ["골격 등 고정 요소1"]
-      },
-      "similarity_points": ["닮은 점1 (30자 이상)", "닮은 점2 (30자 이상)", "닮은 점3 (30자 이상)"]
+      "reasons": ["근거1 (60자+)", "근거2 (60자+)"],
+      "similarity_points": ["닮은점1 (50자+)", "닮은점2 (50자+)", "닮은점3 (50자+)"]
     },
     "appearance_tier": {
       "score": 7,
-      "tier_name": "인스타에서 자주 보이는 유형",
-      "tier_description": "1=논외 / 6=잘생김 / 7=인스타 유형 / 8=연예인급 / 9=고등급 / 10=세계급",
-      "above_percentile": 25
+      "tier_name": "유형명 (예: 인스타 자주 보이는 유형)",
+      "above_percentile": 25,
+      "target_score": 9,
+      "target_percentile": 8,
+      "potential_reason": "변화 시 이 점수까지 갈 수 있는 이유 (50자+)"
     },
     "weaknesses": [
-      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰 사실 (25자 이상)", "impact": "인상 영향 (20자 이상)", "solution": "비의료 보완책 (30자 이상)"},
-      {"title": "단점2", "observation": "...", "impact": "...", "solution": "..."},
-      {"title": "단점3", "observation": "...", "impact": "...", "solution": "..."}
+      {"title": "단점1", "observation": "관찰 사실 자세히 (60자+)", "impact": "인상 영향 (50자+)", "solution": "비의료 보완책 자세히 (80자+)"},
+      {"title": "단점2", "observation": "60자+", "impact": "50자+", "solution": "80자+"},
+      {"title": "단점3", "observation": "60자+", "impact": "50자+", "solution": "80자+"}
     ]
   },
   "comparison": {
@@ -369,92 +442,84 @@ $schema''';
     "target_keywords": ["키워드1", "키워드2", "키워드3"],
     "gap_percent": 45
   },
-  "radar": {
-    "current": {"눈매": 0.5, "코": 0.5, "얼굴윤곽": 0.5, "스타일": 0.4},
-    "target": {"눈매": 0.85, "코": 0.7, "얼굴윤곽": 0.75, "스타일": 0.85}
-  },
   "consultant_report_full": {
-    "quote": "전문가 코멘트 (50자 이상)",
-    "observation": "현재 관찰 (30자 이상)",
-    "impact": "인상 영향 (30자 이상)",
-    "gap": "핵심 갭 (20자 이상)",
-    "direction": "변화 방향 (20자 이상)"
-  },
-  "three_factor": {
-    "physical": "신체관리 한 문단 (40자 이상)",
-    "face": "얼굴관리 한 문단 (40자 이상)",
-    "fashion": "패션 한 문단 (40자 이상)"
+    "quote": "전문가 코멘트 (50자+)",
+    "observation": "현재 관찰 (50자+)",
+    "impact": "인상 영향 (50자+)",
+    "gap": "핵심 갭 (40자+)",
+    "direction": "변화 방향 (40자+)"
   },
   "action_cards": [
     {
       "category": "헤어스타일",
-      "observation": "현재 헤어 (40자 이상)",
-      "impact": "영향 (30자 이상)",
-      "change": "개선 (30자 이상)",
-      "result": "결과 (30자 이상)",
-      "application": "120자 이상",
-      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "observation": "현재 헤어 상태 자세히 (60자+)",
+      "impact": "인상에 미치는 영향 (50자+)",
+      "change": "구체 개선 방법 (60자+)",
+      "result": "변화 후 인상 (50자+)",
+      "application": "관찰→영향→변화→결과 연결 설명 (100자+)",
+      "timeline": "오늘 가능",
+      "gap_reduction": 15,
+      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자+)", "description": "스타일 요소 (40자+)"}]
     },
     {
       "category": "패션",
-      "observation": "현재 패션 (40자 이상)",
-      "impact": "영향 (30자 이상)",
-      "change": "개선 (30자 이상)",
-      "result": "결과 (30자 이상)",
-      "application": "120자 이상",
-      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "observation": "현재 패션 상태 자세히 (60자+)",
+      "impact": "영향 (50자+)",
+      "change": "개선 방법 (60자+)",
+      "result": "결과 (50자+)",
+      "application": "100자+",
+      "timeline": "1주일",
+      "gap_reduction": 20,
+      "references": [{"name": "솔로 배우/가수 이름", "context": "50자+", "description": "40자+"}]
     },
     {
       "category": "그루밍",
-      "observation": "현재 그루밍 (40자 이상)",
-      "impact": "영향 (30자 이상)",
-      "change": "개선 (30자 이상)",
-      "result": "결과 (30자 이상)",
-      "application": "120자 이상",
-      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "observation": "현재 그루밍 자세히 (60자+)",
+      "impact": "영향 (50자+)",
+      "change": "개선 방법 (60자+)",
+      "result": "결과 (50자+)",
+      "application": "100자+",
+      "timeline": "1주일",
+      "gap_reduction": 12,
+      "references": [{"name": "솔로 배우/가수 이름", "context": "50자+", "description": "40자+"}]
     }
-  ],
+  ]
+}''';
+
+  // styling 응답 schema — makeup_steps + fashion_looks
+  static String _stylingSchema() => '''반드시 아래 JSON 형식으로만 응답:
+
+{
   "makeup_steps": [
-    {"step_number": 1, "step_name": "기초", "description": "기초 단계 설명", "products": [{"name": "제품명", "shade": null, "category": "카테고리", "usage": "사용법"}], "tip": "팁"},
-    {"step_number": 2, "step_name": "베이스", "description": "베이스 단계", "products": [{"name": "제품명", "shade": "색상", "category": "파운데이션", "usage": "사용법"}], "tip": "팁"},
-    {"step_number": 3, "step_name": "음영", "description": "음영 단계", "products": [{"name": "제품명", "shade": "색상", "category": "눈썹", "usage": "사용법"}], "tip": "팁"},
-    {"step_number": 4, "step_name": "마무리", "description": "마무리 단계", "products": [{"name": "제품명", "shade": null, "category": "파우더", "usage": "사용법"}], "tip": "팁"}
+    {"step_number": 1, "step_name": "베이스", "description": "베이스 단계 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "파운데이션/BB/톤업", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 2, "step_name": "포인트", "description": "포인트 단계 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "카테고리", "usage": "사용법"}], "tip": "팁"}
   ],
   "fashion_looks": [
     {
-      "name": "룩 이름1 (예: 데일리 베이직)",
-      "image_keyword": "Unsplash 영어 키워드 (예: 'white linen shirt jeans men casual')",
+      "name": "룩 이름1 (예: 데일리 캐주얼)",
+      "image_keyword": "Unsplash 영어 키워드 — 단품/소품/플랫레이만 (인물 X, 예: 'white linen shirt flat lay product')",
       "items": [
-        {"category": "Outer", "description": "아우터 설명", "rationale": "이유"},
-        {"category": "Top", "description": "상의 설명", "rationale": "이유"},
-        {"category": "Bottom", "description": "하의 설명", "rationale": "이유"},
-        {"category": "Shoes", "description": "신발 설명", "rationale": "이유"},
-        {"category": "Acc", "description": "액세서리 설명", "rationale": "이유"}
+        {"category": "Top", "description": "상의 짧게", "rationale": "왜 이 아이템 (얼굴형/체형 한 줄)"},
+        {"category": "Bottom", "description": "하의 짧게", "rationale": "한 줄"},
+        {"category": "Shoes", "description": "신발 짧게", "rationale": "한 줄"}
       ],
-      "rationale": "전체 코디 이유",
-      "styling_tip": "스타일링 팁",
+      "rationale": "왜 이 룩이 이 사람에게 어울리는가 — 얼굴형·체형·인상·컬러 시즌 매칭 자세히 (80자+)",
+      "styling_tip": "팁",
       "color_palette": ["#000000", "#FFFFFF"]
     },
     {
-      "name": "룩 이름2 (룩1과 다른 컨셉)",
-      "image_keyword": "룩2 영어 키워드",
+      "name": "룩 이름2 (룩1과 다른 컨셉, 예: 세미포멀)",
+      "image_keyword": "Unsplash 영어 키워드 — 단품/플랫레이만 (인물 X)",
       "items": [
-        {"category": "Outer", "description": "설명", "rationale": "이유"},
-        {"category": "Top", "description": "설명", "rationale": "이유"},
-        {"category": "Bottom", "description": "설명", "rationale": "이유"},
-        {"category": "Shoes", "description": "설명", "rationale": "이유"},
-        {"category": "Acc", "description": "설명", "rationale": "이유"}
+        {"category": "Top", "description": "상의 짧게", "rationale": "한 줄"},
+        {"category": "Bottom", "description": "하의 짧게", "rationale": "한 줄"},
+        {"category": "Shoes", "description": "신발 짧게", "rationale": "한 줄"}
       ],
-      "rationale": "전체 코디 이유",
-      "styling_tip": "스타일링 팁",
+      "rationale": "왜 이 룩이 어울리는가 자세히 (80자+)",
+      "styling_tip": "팁",
       "color_palette": ["#000000", "#808080"]
     }
-  ],
-  "color_palette": {
-    "main": ["#000000", "#FFFFFF"],
-    "accent": ["#C19A6B"],
-    "avoid": ["#FF00FF"]
-  }
+  ]
 }''';
 
   static Map<String, dynamic> _parseJson(String raw) {
@@ -465,11 +530,64 @@ $schema''';
     try {
       return jsonDecode(cleaned) as Map<String, dynamic>;
     } catch (_) {
+      // 1차 fallback: regex로 outer { } 추출
       final match = RegExp(r'\{[\s\S]*\}').firstMatch(cleaned);
       if (match != null) {
-        return jsonDecode(match.group(0)!) as Map<String, dynamic>;
+        try {
+          return jsonDecode(match.group(0)!) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+      // 2차 fallback: balancer — max_tokens로 잘린 응답 복구
+      final balanced = _balanceTruncatedJson(cleaned);
+      if (balanced != null) {
+        try {
+          debugPrint('🟠 JSON balancer: 잘린 응답 복구 시도');
+          return jsonDecode(balanced) as Map<String, dynamic>;
+        } catch (e) {
+          debugPrint('🟠 balancer 복구 실패: $e');
+        }
       }
       throw Exception('Claude JSON 파싱 실패: ${cleaned.substring(0, cleaned.length.clamp(0, 200))}');
     }
+  }
+
+  // max_tokens로 잘린 JSON을 graceful하게 복구
+  // 마지막 완전한 콤마 위치까지 자르고 누락된 } ] 채워서 파싱 가능하게
+  static String? _balanceTruncatedJson(String text) {
+    String working = text;
+    // 50회까지 시도 (마지막 필드부터 거꾸로 자르며 복구 시도)
+    for (int attempt = 0; attempt < 50; attempt++) {
+      // 마지막 콤마 위치 찾기 — 보통 잘린 곳 근처에 콤마 없음, 그 앞 마지막 완전한 키-값
+      final lastComma = working.lastIndexOf(',');
+      if (lastComma <= 0) return null;
+      working = working.substring(0, lastComma);
+
+      // 카운트: 열린 { [ vs 닫힌 } ] (string 안은 무시)
+      int curly = 0, bracket = 0;
+      bool inString = false, escape = false;
+      for (int i = 0; i < working.length; i++) {
+        final c = working[i];
+        if (escape) { escape = false; continue; }
+        if (c == '\\') { escape = true; continue; }
+        if (c == '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (c == '{') curly++;
+        else if (c == '}') curly--;
+        else if (c == '[') bracket++;
+        else if (c == ']') bracket--;
+      }
+      if (curly < 0 || bracket < 0) continue;
+      if (inString) continue; // string 한가운데 잘림 — 더 거슬러 올라가야
+
+      // 닫는 괄호 추가 — bracket 먼저 (안쪽), 그 다음 curly
+      final balanced = working + (']' * bracket) + ('}' * curly);
+      try {
+        jsonDecode(balanced);
+        return balanced; // 파싱 성공한 첫 결과 반환
+      } catch (_) {
+        // 더 거슬러 올라가서 재시도
+      }
+    }
+    return null;
   }
 }

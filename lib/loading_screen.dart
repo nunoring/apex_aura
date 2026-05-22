@@ -206,6 +206,26 @@ class _LoadingScreenState extends State<LoadingScreen>
       });
       _startGptMessages();
 
+      // 메인 호출과 동시에 styling 호출도 백그라운드로 시작 (Pro인 경우)
+      // 메인 응답 도착하면 즉시 ResultScreen 진입, styling은 사용자가 페이지 swipe할 때까지 계속 진행
+      Future<Map<String, dynamic>>? stylingFuture;
+      if (widget.isPro) {
+        try {
+          final imageBytes = await widget.primaryImage.readAsBytes();
+          stylingFuture = ClaudeService.analyzeStyling(
+            imageBytes: imageBytes,
+            mimeType: 'image/jpeg',
+            gender: widget.gender,
+            faceData: faceData,
+          ).catchError((e) {
+            debugPrint('🟡 Styling 호출 실패 (메인은 OK): $e');
+            return <String, dynamic>{};
+          });
+        } catch (e) {
+          debugPrint('🟡 Styling 호출 시작 실패: $e');
+        }
+      }
+
       Map<String, dynamic> result;
       try {
         result = await _getAnalysisWithRetry(faceData);
@@ -295,6 +315,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               imageFile: widget.primaryImage,
               faceData: faceData!,
               gender: widget.gender,
+              stylingFuture: stylingFuture,
             ),
           ),
         );
@@ -360,7 +381,7 @@ class _LoadingScreenState extends State<LoadingScreen>
           faceData['current_face_type']?.toString() ?? '강아지상';
       final effectiveAnimalType =
           widget.animalType.isNotEmpty ? widget.animalType : currentType;
-      final result = await ClaudeService.analyze(
+      final result = await ClaudeService.analyzeMain(
         imageBytes: imageBytes,
         mimeType: 'image/jpeg',
         animalType: effectiveAnimalType,
