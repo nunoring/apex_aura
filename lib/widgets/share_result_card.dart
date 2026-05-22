@@ -44,7 +44,7 @@ class ShareResultCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // 앱 이름
-          const Text('APEX AURA',
+          const Text('닮은꼴 찾기',
               style: TextStyle(
                   fontSize: 10, color: Color(0xFF555555),
                   letterSpacing: 3, fontWeight: FontWeight.w600)),
@@ -172,6 +172,31 @@ class ShareResultCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+
+          // "나도 따라해보기" CTA — 공유 카드 마지막 줄
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8D5B7),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF1A0F00)),
+                SizedBox(width: 6),
+                Text('나도 따라해보기',
+                    style: TextStyle(
+                        fontSize: 13, color: Color(0xFF1A0F00),
+                        fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text('Play 스토어 → 닮은꼴 찾기 검색',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 9, color: Color(0xFF555555))),
+          const SizedBox(height: 10),
 
           // 해시태그
           const Text('#ApexAura  #동물상분석  #나의동물상',

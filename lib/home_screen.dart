@@ -16,7 +16,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final List<File> _selectedImages = [];
-  int _selectedAnimal = -1;
   String _gender = ''; // 'male' | 'female'
   final ImagePicker _picker = ImagePicker();
   List<Map<String, dynamic>> _history = [];
@@ -188,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _resetInputForm() {
     setState(() {
       _selectedImages.clear();
-      _selectedAnimal = -1;
       _gender = '';
     });
   }
@@ -360,16 +358,38 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 상단 로고
+              // 상단 로고 + 빌드 확인 마커
               const Center(
-                child: Text(
-                  "APEX AURA",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFFE8D5B7),
-                    letterSpacing: 4,
-                  ),
+                child: Column(
+                  children: [
+                    Text(
+                      "닮은꼴 찾기",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFE8D5B7),
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "AI 외모 컨설턴트 · 24시간 무제한",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF666644),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      "[BUILD 2026-05-22-A]",
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Color(0xFFE8A030),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -391,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
-                  height: 106,
+                  height: 124,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _isSubscribed
@@ -599,97 +619,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(child: Container(height: 0.5, color: const Color(0xFF222222))),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              // 동물상 선택 — 5개 전체 표시 (가로 스크롤 없음)
-              const Text("동물상 선택", style: TextStyle(color: Color(0xFF555555), fontSize: 11, letterSpacing: 0.5)),
-              const SizedBox(height: 10),
-              Row(
-                children: _animals.asMap().entries.map((e) {
-                  final index = e.key;
-                  final isSelected = _selectedAnimal == index;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedAnimal = index),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 80,
-                        margin: EdgeInsets.only(
-                            right: index < _animals.length - 1 ? 6 : 0),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF1E1900)
-                              : const Color(0xFF1C1C1C),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? const Color(0xFFE8D5B7)
-                                : const Color(0xFF2A2A2A),
-                            width: isSelected ? 1.5 : 0.5,
-                          ),
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.asset(
-                                'assets/images/${_animals[index]["imgKey"]!}_${_gender.isEmpty ? "male" : _gender}.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox(),
-                              ),
-                            ),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      Colors.black.withAlpha(
-                                          isSelected ? 130 : 170),
-                                    ],
-                                    stops: const [0.3, 1.0],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 6, left: 0, right: 0,
-                              child: Text(
-                                _animals[index]["label"]!.replaceAll("상", ""),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: isSelected
-                                      ? const Color(0xFFE8D5B7)
-                                      : const Color(0xFFAAAAAA),
-                                ),
-                              ),
-                            ),
-                            if (isSelected)
-                              Positioned(
-                                top: 4, right: 4,
-                                child: Container(
-                                  width: 14, height: 14,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE8D5B7),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.check,
-                                      size: 9, color: Color(0xFF1A0F00)),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
               const SizedBox(height: 24),
 
               // 분석 시작 버튼
@@ -697,13 +626,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: (_selectedImages.isNotEmpty && _selectedAnimal != -1 && _gender.isNotEmpty)
+                  onPressed: (_selectedImages.isNotEmpty && _gender.isNotEmpty)
                       ? () async {
+                          // 광고 제거 — 구독제 모델로 전환
                           final shouldRefresh = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => LoadingScreen(
-                                animalType: _animals[_selectedAnimal]["label"]!,
+                                animalType: '', // AI 자동 판정 (사용자 선택 제거)
                                 sliderValue: 0.5,
                                 imageFiles: _selectedImages,
                                 gender: _gender,
@@ -724,13 +654,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    (_selectedImages.isEmpty || _selectedAnimal == -1 || _gender.isEmpty)
-                        ? '사진 · 성별 · 추구미를 선택해주세요'
-                        : '분석 시작하기',
+                    (_selectedImages.isEmpty || _gender.isEmpty)
+                        ? '사진 · 성별을 선택해주세요'
+                        : 'AI 분석 시작하기',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: (_selectedImages.isEmpty || _selectedAnimal == -1)
+                      color: (_selectedImages.isEmpty || _gender.isEmpty)
                           ? const Color(0xFF444444)
                           : const Color(0xFF1A0F00),
                     ),

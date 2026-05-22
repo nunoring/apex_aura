@@ -116,26 +116,26 @@ class _PaywallBottomSheetState extends State<PaywallBottomSheet> {
           ),
           const SizedBox(height: 14),
 
-          const Text('APEX AURA PRO',
+          const Text('AI 외모 컨설턴트',
               style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w800,
-                  color: Color(0xFFE8D5B7), letterSpacing: 1)),
+                  fontSize: 20, fontWeight: FontWeight.w800,
+                  color: Color(0xFFE8D5B7), letterSpacing: 0.5)),
           const SizedBox(height: 6),
-          const Text('상세 수치 분석 · 맞춤 변신 플랜 · 추천 제품',
+          const Text('24시간 무제한 분석 · 1:1 컨설팅 수준의 깊이',
               style: TextStyle(fontSize: 12, color: Color(0xFF777777))),
 
           const SizedBox(height: 20),
 
-          // 기능 목록
+          // 기능 목록 (컨설팅 톤)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                _featureRow('👁️ 눈꼬리·황금비율·얼굴형 정밀 수치', true),
-                _featureRow('📊 추구미 갭 분석 (항목별 난이도)', true),
-                _featureRow('✂️ 헤어·피부·그루밍 맞춤 플랜', true),
-                _featureRow('🧴 피부 타입별 추천 성분·제품', true),
-                _featureRow('🎯 동물상 AI 수치 판별', false),
+                _featureRow('🔍 단점 분석 + 비의료 보완책 (헤어·메이크업·패션)', true),
+                _featureRow('🎯 닮은꼴 셀럽 매칭 + 시각 비교', true),
+                _featureRow('💄 메이크업 4단계 + 추천 제품 정밀 가이드', true),
+                _featureRow('👔 패션 룩 2~3개 + 코디 + 컬러 팔레트', true),
+                _featureRow('📈 외모 점수 1~10등급 + 인상 분석', true),
               ],
             ),
           ),

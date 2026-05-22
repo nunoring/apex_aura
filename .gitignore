@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# === SECURITY: API keys ===
+# config.dart contains API keys — NEVER commit
+lib/config.dart
+# Backup config template (no secrets) — commit this instead
+!lib/config.example.dart

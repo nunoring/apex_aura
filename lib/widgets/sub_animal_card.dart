@@ -41,6 +41,7 @@ class SubAnimalCard extends StatelessWidget {
                 child: Image.asset(
                   imagePath!,
                   width: 36, height: 36, fit: BoxFit.cover,
+                  alignment: const Alignment(0, -0.6),
                   errorBuilder: (_, __, ___) =>
                       Text(emoji, style: const TextStyle(fontSize: 22)),
                 ),

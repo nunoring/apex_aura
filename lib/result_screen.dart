@@ -11,6 +11,8 @@ import 'dart:typed_data';
 import 'subscription_service.dart';
 import 'paywall_screen.dart';
 import 'services/share_service.dart';
+import 'services/tmdb_service.dart';
+import 'services/unsplash_service.dart';
 import 'widgets/animal_compare_card.dart';
 import 'widgets/gap_progress_bar.dart';
 import 'widgets/gap_radar_chart.dart';
@@ -267,6 +269,9 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(height: 16),
           // 셀럽 닮은꼴
           _buildCelebMatchSection(),
+          const SizedBox(height: 20),
+          // 컨설팅 톤 — 단점 + 비의료 보완책 (Free는 블러)
+          _buildWeaknessSection(),
         ],
       ),
     );
@@ -436,6 +441,28 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
             ),
           ],
+          // 다음 페이지로 안내 CTA (사용자가 "어떻게 하라는지" 모를 때 해소)
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1500),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8A030).withAlpha(80), width: 0.7),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFFE8A030)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '다음 페이지에서 갭을 좁히는 구체적인 방법 3가지를 확인해요',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFE8D5B7), height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -513,17 +540,50 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(height: 16),
 
           if (threeFactor != null) ...[
-            _threeFactorCard('💪 신체관리', threeFactor['physical']?.toString() ?? ''),
+            _iconThreeFactorCard(
+              icon: Icons.fitness_center,
+              accent: const Color(0xFF27AE60),
+              title: '신체관리',
+              content: threeFactor['physical']?.toString() ?? '',
+            ),
             const SizedBox(height: 10),
-            _threeFactorCard('👤 얼굴관리', threeFactor['face']?.toString() ?? ''),
+            _iconThreeFactorCard(
+              icon: Icons.face_retouching_natural,
+              accent: const Color(0xFFE8A030),
+              title: '얼굴관리',
+              content: threeFactor['face']?.toString() ?? '',
+            ),
             const SizedBox(height: 10),
-            _threeFactorCard('👔 패션', threeFactor['fashion']?.toString() ?? ''),
-          ] else ...[
+            _iconThreeFactorCard(
+              icon: Icons.checkroom,
+              accent: const Color(0xFF4A90D9),
+              title: '패션',
+              content: threeFactor['fashion']?.toString() ?? '',
+            ),
+          ],
+          // actionCards가 있으면 always 표시 (three_factor 위에 또는 단독으로)
+          if (actionCards.isNotEmpty) ...[
+            if (threeFactor != null) const SizedBox(height: 16),
             ...actionCards.map((card) {
               final c = card as Map<String, dynamic>;
+              final refs = (c['references'] as List?) ?? [];
+              final refName = refs.isNotEmpty
+                  ? (refs.first as Map)['name']?.toString() ?? ''
+                  : '';
+              final refContext = refs.isNotEmpty
+                  ? (refs.first as Map)['context']?.toString() ?? ''
+                  : '';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _threeFactorCard(c['category']?.toString() ?? '', c['principle']?.toString() ?? ''),
+                child: _actionCardWithCeleb(
+                  category: c['category']?.toString() ?? '',
+                  application: c['application']?.toString() ??
+                      c['principle']?.toString() ??
+                      c['observation']?.toString() ??
+                      '',
+                  refName: refName,
+                  refContext: refContext,
+                ),
               );
             }),
           ],
@@ -551,6 +611,208 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
+  // 3박자 솔루션 카드 — 아이콘 강조 버전
+  Widget _iconThreeFactorCard({
+    required IconData icon,
+    required Color accent,
+    required String title,
+    required String content,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withAlpha(50), width: 0.7),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: accent.withAlpha(30),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withAlpha(80), width: 0.5),
+            ),
+            child: Icon(icon, size: 22, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        fontSize: 14, color: accent, fontWeight: FontWeight.w700)),
+                if (content.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(content,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFFAAAAAA), height: 1.6)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Unsplash 이미지 헬퍼 (패션/메이크업 키워드 매칭)
+  Widget _unsplashImage(String query, {double width = 120, double height = 140}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: FutureBuilder<String?>(
+        future: UnsplashService.fetchImageUrl(query),
+        builder: (context, snapshot) {
+          final url = snapshot.data;
+          Widget ph = Container(
+            width: width, height: height,
+            color: const Color(0xFF1A1A1A),
+            alignment: Alignment.center,
+            child: snapshot.connectionState == ConnectionState.waiting
+                ? const SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 1.5, color: Color(0xFF555555)))
+                : const Icon(Icons.image_outlined, size: 18, color: Color(0xFF444444)),
+          );
+          if (url == null || url.isEmpty) return ph;
+          return Image.network(url,
+              width: width, height: height, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => ph);
+        },
+      ),
+    );
+  }
+
+  // 메이크업 단계명 → Unsplash 영어 키워드
+  String _makeupKeyword(String stepName) {
+    final s = stepName.trim();
+    if (s.contains('기초') || s.contains('스킨')) return 'skincare beauty product';
+    if (s.contains('베이스') || s.contains('파운데이션')) return 'foundation makeup beauty';
+    if (s.contains('음영') || s.contains('아이') || s.contains('눈')) return 'eyeshadow makeup';
+    if (s.contains('마무리') || s.contains('립') || s.contains('블러셔')) return 'lipstick blush makeup';
+    return 'makeup beauty';
+  }
+
+  // 액션 카드 + references 셀럽 사진 (위키 API)
+  Widget _actionCardWithCeleb({
+    required String category,
+    required String application,
+    required String refName,
+    required String refContext,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(category,
+              style: const TextStyle(
+                  fontSize: 13, color: Color(0xFFE8A030),
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          if (refName.isNotEmpty)
+            FutureBuilder<String?>(
+              future: TmdbService.fetchPhotoUrl(refName),
+              builder: (context, snapshot) {
+                final url = snapshot.data;
+                final hasPhoto = url != null && url.isNotEmpty;
+                // 사진 못 찾으면 사진 영역 hide, 텍스트만 표시 (placeholder 안 띄움)
+                if (!hasPhoto &&
+                    snapshot.connectionState != ConnectionState.waiting) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star_outline,
+                            size: 12, color: Color(0xFFE8A030)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text('$refName · $refContext',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFF888888),
+                                  height: 1.4)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: snapshot.connectionState == ConnectionState.waiting
+                          ? Container(
+                              width: 80, height: 100,
+                              color: const Color(0xFF1A1A1A),
+                              alignment: Alignment.center,
+                              child: const SizedBox(
+                                  width: 14, height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 1.5, color: Color(0xFF555555))),
+                            )
+                          : (url!.startsWith('assets/')
+                              ? Image.asset(url,
+                                  width: 80, height: 100, fit: BoxFit.cover,
+                                  alignment: const Alignment(0, -0.85))
+                              : Image.network(url,
+                                  width: 80, height: 100, fit: BoxFit.cover,
+                                  alignment: const Alignment(0, -0.85))),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.star_outline,
+                                  size: 12, color: Color(0xFFE8A030)),
+                              const SizedBox(width: 4),
+                              Text(refName,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Color(0xFFE8D5B7),
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                          if (refContext.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(refContext,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 10, color: Color(0xFF888888),
+                                    height: 1.4)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          if (application.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(application,
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFFCCCCCC), height: 1.6)),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ─── Pro Page 5: 메이크업 4단계 ──────────────────────────────────
   Widget _buildPage5Pro() {
     final steps = List<Map<String, dynamic>>.from(
@@ -571,6 +833,7 @@ class _ResultScreenState extends State<ResultScreen> {
           if (steps.isNotEmpty)
             ...steps.asMap().entries.map((e) {
               final step = e.value;
+              final stepName = step['step_name']?.toString() ?? '';
               final products = List<Map<String, dynamic>>.from(
                   (step['products'] as List?)?.map((p) => p as Map<String, dynamic>) ?? []);
               return Container(
@@ -584,6 +847,16 @@ class _ResultScreenState extends State<ResultScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Unsplash 단계 이미지 (전폭)
+                    if (stepName.isNotEmpty) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 120,
+                        child: _unsplashImage(_makeupKeyword(stepName),
+                            width: double.infinity, height: 120),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     Row(children: [
                       Container(
                         width: 24, height: 24,
@@ -680,7 +953,17 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(height: 12),
 
           if (looks.isNotEmpty)
-            ...looks.map((look) => Container(
+            ...looks.asMap().entries.map((entry) {
+              final look = entry.value;
+              final lookName = look['name']?.toString() ?? '';
+              // Gemini가 응답한 image_keyword (영어) 우선 사용, 없으면 성별+이름 fallback
+              final imageKeyword = look['image_keyword']?.toString() ?? '';
+              final fashionKeyword = imageKeyword.isNotEmpty
+                  ? imageKeyword
+                  : (widget.gender == 'female'
+                      ? 'korean women fashion outfit $lookName'
+                      : 'korean men fashion outfit $lookName');
+              return Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -691,7 +974,15 @@ class _ResultScreenState extends State<ResultScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(look['name']?.toString() ?? '',
+                  // Unsplash 패션 룩 이미지 (전폭, 큰 사이즈)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 320,
+                    child: _unsplashImage(fashionKeyword,
+                        width: double.infinity, height: 320),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(lookName,
                       style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
                   if (look['rationale'] != null) ...[
                     const SizedBox(height: 6),
@@ -712,7 +1003,7 @@ class _ResultScreenState extends State<ResultScreen> {
                   ],
                 ],
               ),
-            ))
+            );})
           else if (fashionCard.isNotEmpty)
             _threeFactorCard(fashionCard['category']?.toString() ?? '패션', fashionCard['application']?.toString() ?? '')
           else
@@ -731,10 +1022,25 @@ class _ResultScreenState extends State<ResultScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('컬러 팔레트', style: TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 10),
-                  _paletteRow('메인', List<String>.from(palette['main'] ?? []), const Color(0xFF27AE60)),
-                  _paletteRow('포인트', List<String>.from(palette['accent'] ?? []), const Color(0xFFE8A030)),
-                  _paletteRow('피할 색', List<String>.from(palette['avoid'] ?? []), const Color(0xFFC0392B)),
+                  const SizedBox(height: 4),
+                  const Text('옷·소품 살 때 이 색 위주로 — 인상과 어울리는 색상',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF666666))),
+                  const SizedBox(height: 12),
+                  _paletteRowLabeled(
+                      label: '메인',
+                      sub: '70% 차지 — 기본 상하의',
+                      colors: List<String>.from(palette['main'] ?? []),
+                      tagColor: const Color(0xFF27AE60)),
+                  _paletteRowLabeled(
+                      label: '포인트',
+                      sub: '20% 차지 — 액세서리·신발',
+                      colors: List<String>.from(palette['accent'] ?? []),
+                      tagColor: const Color(0xFFE8A030)),
+                  _paletteRowLabeled(
+                      label: '피할 색',
+                      sub: '인상과 충돌 — 매장에서 패스',
+                      colors: List<String>.from(palette['avoid'] ?? []),
+                      tagColor: const Color(0xFFC0392B)),
                 ],
               ),
             ),
@@ -769,9 +1075,10 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Widget _buildAnimalCompositeBar() {
-    final scores = AnimalScoreService.calculate(faceData);
+    final scores = _resolveAnimalScores();
     if (scores.isEmpty) return const SizedBox.shrink();
-    final sorted = scores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sorted = scores.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
     const emojiMap = {
       '강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊',
@@ -840,7 +1147,19 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Widget _buildCelebMatchSection() {
     final currentType = faceData['current_face_type']?.toString() ?? '';
-    final celebs = AnimalScoreService.getCelebs(currentType, widget.gender);
+    final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
+    final lookalikes = fi?['lookalike_celebs'] as List?;
+    List<Map<String, dynamic>> celebs;
+    if (lookalikes != null && lookalikes.isNotEmpty) {
+      // Gemini가 사용자별 맞춤 닮은꼴 셀럽 추천
+      celebs = lookalikes
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } else {
+      // fallback: 동물상별 고정 카탈로그
+      celebs = AnimalScoreService.getCelebs(currentType, widget.gender);
+    }
     if (celebs.isEmpty) return const SizedBox.shrink();
     return CelebMatchCard(
       userImage: imageFile,
@@ -852,7 +1171,6 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Widget _buildAffiliateProductRow({required String name, String? shade, String? prefix}) {
     if (name.isEmpty) return const SizedBox.shrink();
-    final query = Uri.encodeComponent(name);
     final displayName = [
       if (prefix != null) prefix,
       name,
@@ -866,22 +1184,26 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(displayName,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF888888))),
+                style: const TextStyle(fontSize: 12, color: Color(0xFFCCCCCC), height: 1.4)),
           ),
           GestureDetector(
-            onTap: () => launchUrl(
-              Uri.parse('https://www.coupang.com/np/search?q=$query'),
-              mode: LaunchMode.externalApplication,
-            ),
+            onTap: () => _showInAppImageDialog(name),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1000),
+                color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFE8A030).withAlpha(60), width: 0.5),
+                border: Border.all(color: const Color(0xFF333333), width: 0.5),
               ),
-              child: const Text('쿠팡 검색',
-                  style: TextStyle(fontSize: 9, color: Color(0xFFE8A030))),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.image_outlined, size: 11, color: Color(0xFF888888)),
+                  SizedBox(width: 3),
+                  Text('이미지',
+                      style: TextStyle(fontSize: 9, color: Color(0xFF888888))),
+                ],
+              ),
             ),
           ),
         ],
@@ -889,20 +1211,137 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  Widget _buildAffiliateDisclaimer() {
+  // 인앱 이미지 다이얼로그 (외부 브라우저 안 열고 Unsplash 사진 1장 표시)
+  void _showInAppImageDialog(String query) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withAlpha(220),
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.pop(ctx),
+        child: Stack(
+          children: [
+            Center(
+              child: FutureBuilder<String?>(
+                future: UnsplashService.fetchImageUrl(query),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(
+                      width: 30, height: 30,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Color(0xFF888888)),
+                    );
+                  }
+                  final url = snapshot.data;
+                  if (url == null || url.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Text('이미지를 찾을 수 없어요\n($query)',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Color(0xFFAAAAAA), fontSize: 14)),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: InteractiveViewer(
+                        child: Image.network(url, fit: BoxFit.contain),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 40, right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+            Positioned(
+              bottom: 40, left: 20, right: 20,
+              child: Column(
+                children: [
+                  Text(query,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  const Text('© Unsplash',
+                      style: TextStyle(color: Color(0xFF666666), fontSize: 9)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAffiliateDisclaimer() => const SizedBox.shrink();
+
+  // 컬러 팔레트 행 — 설명 추가된 버전 (사용법 명시)
+  Widget _paletteRowLabeled({
+    required String label,
+    required String sub,
+    required List<String> colors,
+    required Color tagColor,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D0D0D),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
-        ),
-        child: const Text(
-          '이 링크는 쿠팡 파트너스 제휴 링크로, 구매 시 일정 수수료가 제공될 수 있습니다.',
-          style: TextStyle(fontSize: 9, color: Color(0xFF444444), height: 1.4),
-        ),
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: tagColor.withAlpha(25),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: tagColor.withAlpha(80), width: 0.5),
+              ),
+              child: Text(label,
+                  style: TextStyle(fontSize: 11, color: tagColor, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(sub,
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8, runSpacing: 6,
+            children: colors.map((c) {
+              Color hexColor;
+              try {
+                final cleaned = c.replaceAll('#', '');
+                hexColor = Color(int.parse('FF$cleaned', radix: 16));
+              } catch (_) {
+                hexColor = const Color(0xFF888888);
+              }
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 22, height: 22,
+                    decoration: BoxDecoration(
+                      color: hexColor,
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: const Color(0xFF333333), width: 0.5),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(c,
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF888888))),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -2163,6 +2602,50 @@ class _ResultScreenState extends State<ResultScreen> {
           const SizedBox(height: 4),
           Text(s.tagline,
               style: TextStyle(fontSize: 11, color: s.tierColor.withAlpha(180), height: 1.4)),
+          // AI 등급 표시 (Gemini appearance_tier — 1~10 + tier_name)
+          Builder(builder: (context) {
+            final tier = analysisResult['first_impression']?['appearance_tier']
+                as Map<String, dynamic>?;
+            if (tier == null) return const SizedBox.shrink();
+            final score10 = (tier['score'] as num?)?.toInt();
+            final tierName = tier['tier_name']?.toString() ?? '';
+            if (score10 == null || tierName.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1500),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE8A030).withAlpha(60), width: 0.5),
+                ),
+                child: Row(
+                  children: [
+                    Text('AI 등급 ',
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF888866))),
+                    Text('$score10',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w900,
+                            color: Color(0xFFE8A030))),
+                    const Text(' / 10',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF666644))),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 1, height: 14,
+                      color: const Color(0xFF333322),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(tierName,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFFE8D5B7),
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
           const SizedBox(height: 14),
           Container(height: 0.5, color: const Color(0xFF1E1E1E)),
           const SizedBox(height: 12),
@@ -2952,30 +3435,289 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
+  // 컨설팅 단점 + 비의료 보완책 섹션 (Free는 블러)
+  Widget _buildWeaknessSection() {
+    final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
+    final weaknesses = fi?['weaknesses'] as List?;
+    if (weaknesses == null || weaknesses.isEmpty) return const SizedBox.shrink();
+    final isPro = _isPro;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFC0392B).withAlpha(40), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  size: 14, color: Color(0xFFC0392B)),
+              const SizedBox(width: 6),
+              const Text('컨설팅 — 단점과 보완책',
+                  style: TextStyle(
+                      fontSize: 12, color: Color(0xFFE8D5B7),
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(width: 8),
+              if (!isPro)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1500),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline,
+                          size: 9, color: Color(0xFFE8A030)),
+                      SizedBox(width: 3),
+                      Text('Pro',
+                          style: TextStyle(
+                              fontSize: 9, color: Color(0xFFE8A030),
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isPro
+                ? '관찰된 단점과 비의료 보완책. 헤어·메이크업·패션으로 즉시 적용 가능.'
+                : '구독자에게 단점 분석과 보완책을 공개합니다.',
+            style: const TextStyle(fontSize: 10, color: Color(0xFF555555), height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          ...weaknesses.asMap().entries.map((entry) {
+            final i = entry.key;
+            final w = entry.value as Map;
+            final title = w['title']?.toString() ?? '';
+            final observation = w['observation']?.toString() ?? '';
+            final impact = w['impact']?.toString() ?? '';
+            final solution = w['solution']?.toString() ?? '';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D0D0D),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF1E1E1E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 18, height: 18,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFC0392B).withAlpha(40),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text('${i + 1}',
+                              style: const TextStyle(
+                                  fontSize: 10, color: Color(0xFFC0392B),
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(title,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFFE8D5B7),
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 관찰 — 항상 공개 (티저)
+                  if (observation.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(
+                            width: 40,
+                            child: Text('관찰',
+                                style: TextStyle(fontSize: 9, color: Color(0xFF555555))),
+                          ),
+                          Expanded(
+                            child: Text(observation,
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFFAAAAAA), height: 1.5)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // 영향 + 솔루션 — Pro만 (Curiosity Blur)
+                  if (isPro) ...[
+                    if (impact.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(
+                              width: 40,
+                              child: Text('영향',
+                                  style: TextStyle(fontSize: 9, color: Color(0xFF555555))),
+                            ),
+                            Expanded(
+                              child: Text(impact,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF888888), height: 1.5)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (solution.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1500),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.check_circle_outline,
+                                size: 12, color: Color(0xFFE8A030)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(solution,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFFE8D5B7), height: 1.5)),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ] else
+                    GestureDetector(
+                      onTap: _showPaywall,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1500),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: const Color(0xFFE8A030).withAlpha(60), width: 0.5),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.lock_outline,
+                                size: 12, color: Color(0xFFE8A030)),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text('이 단점의 인상 영향과 보완책 (헤어·메이크업·패션) 보기',
+                                  style: TextStyle(fontSize: 10, color: Color(0xFFE8A030))),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
+          // 의료 면책 (필수)
+          const SizedBox(height: 4),
+          const Text(
+            '※ 본 분석은 엔터테인먼트·스타일 가이드용이며, 의학적 진단이 아닙니다. 시술·성형 권유 X.',
+            style: TextStyle(fontSize: 9, color: Color(0xFF444444), height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 동물상 % — 우선순위:
+  // 1) Gemini animal_distribution (사진 직접 판단)
+  // 2) Gemini main_animal + sub_animal로 가상 분포 생성 (ML Kit 무시 → 데이터 일관성)
+  // 3) ML Kit AnimalScoreService.calculate (최후 fallback, Gemini 응답 실패 시만)
+  Map<String, double> _resolveAnimalScores() {
+    final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
+    // 1)
+    final dist = fi?['animal_distribution'] as List?;
+    if (dist != null && dist.isNotEmpty) {
+      final map = <String, double>{};
+      for (final item in dist) {
+        if (item is Map) {
+          final name = item['name']?.toString();
+          final pct = (item['percentage'] as num?)?.toDouble();
+          if (name != null && name.isNotEmpty && pct != null) {
+            map[name] = pct;
+          }
+        }
+      }
+      if (map.isNotEmpty) return map;
+    }
+    // 2) Gemini main + sub로 분포 합성 (ML Kit과 충돌 방지)
+    final main = fi?['main_animal']?['name']?.toString() ?? '';
+    final sub = fi?['sub_animal']?['name']?.toString() ?? '';
+    final mainPct = (fi?['animal_match']?['percentage'] as num?)?.toDouble() ?? 60;
+    if (main.isNotEmpty) {
+      final synth = <String, double>{};
+      final mp = mainPct.clamp(40, 85).toDouble();
+      synth[main] = mp;
+      if (sub.isNotEmpty && sub != main) {
+        synth[sub] = (100 - mp).clamp(15, 50).toDouble();
+      }
+      return synth;
+    }
+    // 3) 최후 fallback
+    return AnimalScoreService.calculate(faceData);
+  }
+
   Future<void> _shareResult() async {
     setState(() => _isSharing = true);
     try {
       final s = _abilityScores;
-      final scores = AnimalScoreService.calculate(faceData);
+      final scores = _resolveAnimalScores();
       final sorted = scores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       const emojiMap = {
         '강아지상': '🐶', '고양이상': '🐱', '여우상': '🦊',
         '사슴상': '🦌', '늑대상': '🐺', '토끼상': '🐰', '곰상': '🐻',
       };
 
-      final mainAnimal = sorted.isNotEmpty ? sorted[0].key : (faceData['current_face_type']?.toString() ?? animalType);
-      final subAnimal = sorted.length > 1 ? sorted[1].key : '고양이상';
+      // Gemini main_animal을 단일 진실 소스로 사용 (ML Kit 1순위와 충돌 방지)
+      final fi = analysisResult['first_impression'] as Map<String, dynamic>?;
+      final geminiMain = fi?['main_animal']?['name']?.toString() ?? '';
+      final geminiSub = fi?['sub_animal']?['name']?.toString() ?? '';
+      final geminiTarget = fi?['target_animal']?['name']?.toString() ?? '';
+      final geminiMainPct = (fi?['animal_match']?['percentage'] as num?)?.toInt() ?? 0;
+
+      final mainAnimal = geminiMain.isNotEmpty
+          ? geminiMain
+          : (sorted.isNotEmpty ? sorted[0].key : '강아지상');
+      final subAnimal = geminiSub.isNotEmpty
+          ? geminiSub
+          : (sorted.length > 1 ? sorted[1].key : '고양이상');
+      final targetAnimalName =
+          geminiTarget.isNotEmpty ? geminiTarget : animalType;
+      // mainPercent: Gemini animal_match 우선, 없으면 ML Kit에서 메인 동물상 비율
+      final mainPercent = geminiMainPct > 0
+          ? geminiMainPct
+          : (scores[mainAnimal]?.round() ??
+              (sorted.isNotEmpty ? sorted[0].value.round() : 70));
+      final subPercent = scores[subAnimal]?.round() ??
+          (sorted.length > 1 ? sorted[1].value.round() : 20);
 
       final Uint8List image = await _screenshotController.captureFromWidget(
         ShareResultCard(
           mainAnimal: mainAnimal,
           mainEmoji: emojiMap[mainAnimal] ?? '🐶',
-          mainPercent: sorted.isNotEmpty ? sorted[0].value.round() : 70,
+          mainPercent: mainPercent,
           subAnimal: subAnimal,
           subEmoji: emojiMap[subAnimal] ?? '🐱',
-          subPercent: sorted.length > 1 ? sorted[1].value.round() : 20,
-          targetAnimal: animalType,
-          targetEmoji: emojiMap[animalType] ?? '🦊',
+          subPercent: subPercent,
+          targetAnimal: targetAnimalName,
+          targetEmoji: emojiMap[targetAnimalName] ?? '🦊',
           totalScore: s.total,
           tier: s.tier,
           tierColor: s.tierColor,

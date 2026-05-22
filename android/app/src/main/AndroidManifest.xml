@@ -4,7 +4,7 @@
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
-        android:label="Apex Aura"
+        android:label="닮은꼴 찾기"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -29,6 +29,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- AdMob 앱 ID (테스트 ID — 출시 직전 실제 ID로 교체) -->
+        <!-- 실 ID: AdMob 가입 후 발급. 형식: ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

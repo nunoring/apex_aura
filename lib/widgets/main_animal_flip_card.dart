@@ -114,6 +114,7 @@ class _MainAnimalFlipCardState extends State<MainAnimalFlipCard>
                 width: 110,
                 height: 110,
                 fit: BoxFit.cover,
+                alignment: const Alignment(0, -0.6),
                 errorBuilder: (_, __, ___) =>
                     Text(widget.emoji, style: const TextStyle(fontSize: 60)),
               ),
@@ -164,6 +165,7 @@ class _MainAnimalFlipCardState extends State<MainAnimalFlipCard>
                 child: Image.asset(
                   widget.imagePath!,
                   width: 28, height: 28, fit: BoxFit.cover,
+                  alignment: const Alignment(0, -0.6),
                   errorBuilder: (_, __, ___) =>
                       Text(widget.emoji, style: const TextStyle(fontSize: 22)),
                 ),

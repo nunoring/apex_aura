@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'config.dart';
-import 'services/gemini_service.dart';
+import 'services/claude_service.dart';
 import 'result_screen.dart';
 import 'face_detector_service.dart';
 import 'face_selection_screen.dart';
@@ -11,7 +11,7 @@ import 'history_service.dart';
 class _AnalysisException implements Exception {
   final String code;
   final String message;
-  _AnalysisException(this.code, this.message);
+  _AnalysisException({required this.code, required this.message});
 }
 
 class LoadingScreen extends StatefulWidget {
@@ -209,6 +209,20 @@ class _LoadingScreenState extends State<LoadingScreen>
       Map<String, dynamic> result;
       try {
         result = await _getAnalysisWithRetry(faceData);
+        // ===== 디버그: Gemini 응답에서 핵심 필드 확인 =====
+        final fi = result['first_impression'] as Map<String, dynamic>?;
+        debugPrint('🟢 ML Kit current_face_type: ${faceData['current_face_type']}');
+        debugPrint('🟢 ML Kit face_type_scores: ${faceData['face_type_scores']}');
+        debugPrint('🟢 Gemini main_animal: ${fi?['main_animal']?['name']}');
+        debugPrint('🟢 Gemini sub_animal: ${fi?['sub_animal']?['name']}');
+        debugPrint('🟢 Gemini target_animal: ${fi?['target_animal']?['name']}');
+        debugPrint('🟢 Gemini animal_match.percentage: ${fi?['animal_match']?['percentage']}');
+        debugPrint('🟢 Gemini animal_distribution: ${fi?['animal_distribution']}');
+        debugPrint('🟢 Gemini lookalike_celebs: ${fi?['lookalike_celebs']}');
+        debugPrint('🔵 Gemini appearance_tier: ${fi?['appearance_tier']}');
+        debugPrint('🔵 Gemini weaknesses count: ${(fi?['weaknesses'] as List?)?.length ?? "null"}');
+        debugPrint('🔵 Gemini weaknesses sample: ${(fi?['weaknesses'] as List?)?.firstOrNull}');
+        // =================================================
       } on _AnalysisException catch (e) {
         _timerController.stop();
         if (mounted) {
@@ -248,10 +262,20 @@ class _LoadingScreenState extends State<LoadingScreen>
 
       // 히스토리 저장 (백그라운드, 실패해도 무시)
       final currentType =
-          faceData!['current_face_type']?.toString() ?? widget.animalType;
+          faceData!['current_face_type']?.toString() ?? '강아지상';
+      // animalType이 빈 경우(사용자 선택 제거됨) → Gemini 응답의 target_animal 사용,
+      // 그것도 없으면 currentType과 동일 (변신 개념 약화 = 현재 매력 강화)
+      final resolvedAnimalType = widget.animalType.isNotEmpty
+          ? widget.animalType
+          : ((result['first_impression']?['target_animal']?['name']
+                      ?.toString() ??
+                  '')
+              .isNotEmpty
+              ? result['first_impression']!['target_animal']!['name']!.toString()
+              : currentType);
       HistoryService.save(
         currentType: currentType,
-        targetType: widget.animalType,
+        targetType: resolvedAnimalType,
         gender: widget.gender,
         imageFile: widget.primaryImage,
         analysisResult: result,
@@ -265,7 +289,7 @@ class _LoadingScreenState extends State<LoadingScreen>
           context,
           MaterialPageRoute(
             builder: (_) => ResultScreen(
-              animalType: widget.animalType,
+              animalType: resolvedAnimalType,
               sliderValue: widget.sliderValue,
               analysisResult: result,
               imageFile: widget.primaryImage,
@@ -299,11 +323,14 @@ class _LoadingScreenState extends State<LoadingScreen>
     });
   }
 
+  // 의료법 위반 가능 표현 (의료광고/시술 권유) — 응답에 1개라도 있으면 fallback
+  // 단점/약점 같은 "관찰 표현"은 컨설팅에서 정상 — banned에서 제거
   static const List<String> _bannedWords = [
     '필러', '보톡스', '성형', '수술', '리프팅', '레이저', '시술', '이식', '윤곽술',
-    '처방', '치료', '진료', '임상', '의학적', '의사',
-    '약물', '호르몬',
-    '못생긴', '결함', '흠', '단점', '못난', '추한',
+    '주사', '주입', '주입술', '교정술', '재건',
+    '처방', '치료', '진료', '임상', '의학적', '의사', '병원', '클리닉',
+    '약물', '호르몬', '진통제',
+    '못생긴', '추한', '못난',
   ];
 
   bool _isValidResponse(Map<String, dynamic> data) {
@@ -337,20 +364,51 @@ class _LoadingScreenState extends State<LoadingScreen>
   }) async {
     try {
       final imageBytes = await widget.primaryImage.readAsBytes();
-      final result = await GeminiService.analyze(
+      // animalType이 빈 경우(사용자 선택 제거됨) → ML Kit 자동 판정한 currentType 사용.
+      // Gemini가 그 동물상의 매력 강화 + 자유로운 변신 방향 추천하도록.
+      final currentType =
+          faceData['current_face_type']?.toString() ?? '강아지상';
+      final effectiveAnimalType =
+          widget.animalType.isNotEmpty ? widget.animalType : currentType;
+      final result = await ClaudeService.analyze(
         imageBytes: imageBytes,
         mimeType: 'image/jpeg',
-        animalType: widget.animalType,
+        animalType: effectiveAnimalType,
         gender: widget.gender,
         faceData: faceData,
         isPro: widget.isPro,
       );
-      final hasBanned = _bannedWords.any((w) => jsonEncode(result).contains(w));
-      if (hasBanned) return _buildFallbackResponse();
+      // banned word 매치 확인 — 매치되면 분석 실패로 처리 (가짜 fallback 반환 X)
+      final jsonStr = jsonEncode(result);
+      final matchedWord = _bannedWords.firstWhere(
+        (w) => jsonStr.contains(w),
+        orElse: () => '',
+      );
+      if (matchedWord.isNotEmpty) {
+        debugPrint('🔴 BANNED WORD MATCHED: "$matchedWord" → 분석 실패 처리');
+        throw _AnalysisException(
+          code: 'banned_content',
+          message: 'AI 분석에 부적절한 표현이 포함됐어요. 다른 사진으로 다시 시도해주세요.',
+        );
+      }
+      debugPrint('🟢 Gemini main response OK (${jsonStr.length} chars)');
       return result;
+    } on _AnalysisException {
+      rethrow;
     } catch (e, st) {
-      debugPrint('🔴 GeminiService 에러: $e\n$st');
-      return _buildFallbackResponse();
+      debugPrint('🔴 ClaudeService 에러: $e\n$st');
+      // 쿼터 초과/네트워크 에러 등 — 가짜 fallback 반환 X, 사용자에게 알림
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('quota') || msg.contains('rate limit')) {
+        throw _AnalysisException(
+          code: 'quota_exceeded',
+          message: '오늘의 AI 분석 쿼터가 초과됐어요. 잠시 후 다시 시도해주세요.\n(개발자: Google Cloud 결제 활성화 필요)',
+        );
+      }
+      throw _AnalysisException(
+        code: 'api_error',
+        message: '분석 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.\n\n[디버그] ${e.toString().substring(0, e.toString().length.clamp(0, 300))}',
+      );
     }
   }
 

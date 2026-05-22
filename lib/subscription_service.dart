@@ -6,6 +6,7 @@ class SubscriptionService {
   static bool _initialized = false;
 
   static Future<void> init() async {
+    if (kDevMode) return; // dev 모드: RevenueCat 초기화 자체 스킵 (Invalid API Key 에러 방지)
     if (_initialized) return;
     try {
       await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.error);

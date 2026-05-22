@@ -50,6 +50,7 @@ dependencies:
   cloud_firestore: ^5.0.0
   flutter_native_splash: ^2.4.0
   camera: ^0.11.0
+  google_mobile_ads: ^5.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

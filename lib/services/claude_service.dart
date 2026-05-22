@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import '../config.dart';
 
-class GeminiService {
+// Claude Haiku 4.5 외모 분석 서비스
+// Anthropic REST API + Vision (이미지 + 텍스트)
+// 외모 분석 1등 모델. Gemini 대비 content filter 약함 + 디테일 풍부.
+class ClaudeService {
   static const _systemPrompt =
       '당신은 1회 컨설팅비 30만원의 외모 컨설턴트입니다. '
       '실제 1:1 컨설팅 자료 수준의 깊이로 분석합니다. '
@@ -15,7 +19,7 @@ class GeminiService {
       '솔루션은 비의료 그루밍 (헤어 / 메이크업 / 패션 / 액세서리 / 스킨케어) 만 제시. '
       '의료 행위 권유 절대 금지 — 병원·클리닉 추천 금지, 약물 추천 금지. '
       '얼굴 평가는 인상/비율 관찰까지만, 미적 우열 판단 금지. '
-      '모든 응답은 반드시 JSON만, 다른 텍스트 없이 반환합니다.';
+      '모든 응답은 반드시 JSON만, 다른 텍스트 없이 반환합니다. JSON 앞뒤에 ```json 같은 마크다운 절대 금지.';
 
   static const _animalCatalog = [
     {'name': '강아지상', 'emoji': '🐶', 'keywords': ['부드러움', '친근함', '자연스러움']},
@@ -27,6 +31,33 @@ class GeminiService {
     {'name': '곰상', 'emoji': '🐻', 'keywords': ['듬직함', '편안함', '포근함']},
   ];
 
+  // 이미지 리사이즈 + 압축 (Anthropic API 처리 부담 줄임)
+  // 셀카 5~10MB → 1024px × JPEG 85% ≈ 150~300KB → 처리 안정/빠름
+  static Uint8List _compressImage(Uint8List originalBytes) {
+    try {
+      final decoded = img.decodeImage(originalBytes);
+      if (decoded == null) return originalBytes;
+      // 긴 축 768px 이내로 리사이즈 (Anthropic 권장 1568px 이내, 더 작게 안정)
+      final maxDim = 768;
+      img.Image resized;
+      if (decoded.width > decoded.height) {
+        resized = decoded.width > maxDim
+            ? img.copyResize(decoded, width: maxDim)
+            : decoded;
+      } else {
+        resized = decoded.height > maxDim
+            ? img.copyResize(decoded, height: maxDim)
+            : decoded;
+      }
+      final jpeg = img.encodeJpg(resized, quality: 85);
+      debugPrint('🔵 Image compress: ${originalBytes.length} → ${jpeg.length} bytes (${(jpeg.length / originalBytes.length * 100).toStringAsFixed(1)}%)');
+      return Uint8List.fromList(jpeg);
+    } catch (e) {
+      debugPrint('🔵 Image compress 실패, 원본 사용: $e');
+      return originalBytes;
+    }
+  }
+
   static Future<Map<String, dynamic>> analyze({
     required Uint8List imageBytes,
     required String mimeType,
@@ -35,26 +66,35 @@ class GeminiService {
     required Map<String, dynamic> faceData,
     required bool isPro,
   }) async {
-    // 메인 분석 + 셀럽/분포 별도 분석을 병렬 호출 (응답 시간 손해 0)
-    final results = await Future.wait([
-      _analyzeMain(
-        imageBytes: imageBytes,
-        mimeType: mimeType,
-        animalType: animalType,
-        gender: gender,
-        faceData: faceData,
-        isPro: isPro,
-      ),
-      _analyzeLookalikes(
-        imageBytes: imageBytes,
-        mimeType: mimeType,
-        gender: gender,
-      ),
-    ]);
+    // 이미지 압축 (Claude API 처리 부담 줄이려면 1MB 이하 권장)
+    final compressed = _compressImage(imageBytes);
+    final compressedMime = 'image/jpeg'; // 압축 후 항상 JPEG
 
-    final main = results[0];
-    final lookalikes = results[1];
-    // 메인 응답에 lookalike_celebs / animal_distribution 주입 (first_impression 안쪽)
+    // 순차 호출 (병렬 → 순차: Anthropic 동시 호출 차단 회피)
+    // 1) 메인 분석 먼저 (필수)
+    final main = await _analyzeMain(
+      imageBytes: compressed,
+      mimeType: compressedMime,
+      animalType: animalType,
+      gender: gender,
+      faceData: faceData,
+      isPro: isPro,
+    );
+
+    // 2) 메인 끝나면 약간 대기 후 lookalike (Anthropic이 부담 못 느끼게)
+    await Future.delayed(const Duration(milliseconds: 500));
+    Map<String, dynamic> lookalikes = {};
+    try {
+      lookalikes = await _analyzeLookalikes(
+        imageBytes: compressed,
+        mimeType: compressedMime,
+        gender: gender,
+      );
+    } catch (e) {
+      debugPrint('🟡 Lookalike 실패 (메인은 OK): $e');
+      // 실패해도 메인은 보여줌
+    }
+
     final fi = main['first_impression'] as Map<String, dynamic>?;
     if (fi != null) {
       if (lookalikes['lookalike_celebs'] != null) {
@@ -72,7 +112,6 @@ class GeminiService {
     return main;
   }
 
-  // 메인 분석 (스타일링/액션카드/메이크업/패션 등 큰 응답)
   static Future<Map<String, dynamic>> _analyzeMain({
     required Uint8List imageBytes,
     required String mimeType,
@@ -81,47 +120,33 @@ class GeminiService {
     required Map<String, dynamic> faceData,
     required bool isPro,
   }) async {
-    final model = GenerativeModel(
-      model: 'gemini-2.0-flash',
-      apiKey: kGeminiApiKey,
-      systemInstruction: Content.system(_systemPrompt),
-      generationConfig: GenerationConfig(maxOutputTokens: 8192, temperature: 0.7),
-    );
     final prompt = _buildPrompt(animalType, gender, faceData, isPro);
-    final response = await model.generateContent([
-      Content.multi([
-        DataPart(mimeType, imageBytes),
-        TextPart(prompt),
-      ]),
-    ]);
-    final raw = response.text ?? '';
-    return _parseJson(raw);
+    return _callClaude(
+      systemPrompt: _systemPrompt,
+      userText: prompt,
+      imageBytes: imageBytes,
+      mimeType: mimeType,
+      maxTokens: 4096, // 8192 → 4096 (Anthropic 부하 줄임)
+    );
   }
 
-  // 별도 호출: 닮은 셀럽 + 동물상 분포 (작은 응답, 토큰 부족 X)
   static Future<Map<String, dynamic>> _analyzeLookalikes({
     required Uint8List imageBytes,
     required String mimeType,
     required String gender,
   }) async {
     final genderKo = gender == 'female' ? '여성' : '남성';
-    final model = GenerativeModel(
-      model: 'gemini-2.0-flash',
-      apiKey: kGeminiApiKey,
-      systemInstruction: Content.system(
-          '당신은 사진을 보고 한국 연예인 닮은꼴을 찾는 전문가입니다. JSON만 응답합니다.'),
-      generationConfig: GenerationConfig(maxOutputTokens: 1024, temperature: 0.7),
-    );
-
+    const lookalikeSystem =
+        '당신은 사진을 보고 한국 연예인 닮은꼴을 찾는 전문가입니다. JSON만 응답합니다. ```json 마크다운 금지.';
     final prompt = '''사진의 $genderKo을 보고 다음 두 정보만 JSON으로 응답:
 
-1. 사진의 사람과 실제로 닮은 한국 $genderKo 연예인 3명 (개인 솔로/배우만, 그룹명 금지)
+1. 사진의 사람과 실제로 닮은 한국 $genderKo 연예인 3명 (개인 솔로/배우만, 그룹명 금지 — 위키피디아에 개인 페이지 있는 사람)
 2. 사진을 보고 판단한 동물상 분포 (강아지상/고양이상/여우상/사슴상/늑대상/토끼상/곰상 중 3개, 합 100)
 
 반드시 아래 JSON 형식으로만:
 {
   "lookalike_celebs": [
-    {"name": "한국 연예인 이름1", "trait": "어디가 닮았는지 한 문장", "work": "대표작 또는 소속"},
+    {"name": "한국 연예인 이름1", "trait": "어디가 닮았는지 한 문장 (15자 이상)", "work": "대표작 또는 소속 (10자 이상)"},
     {"name": "한국 연예인 이름2", "trait": "...", "work": "..."},
     {"name": "한국 연예인 이름3", "trait": "...", "work": "..."}
   ],
@@ -133,22 +158,110 @@ class GeminiService {
 }''';
 
     try {
-      final response = await model.generateContent([
-        Content.multi([
-          DataPart(mimeType, imageBytes),
-          TextPart(prompt),
-        ]),
-      ]);
-      final raw = response.text ?? '';
-      // 디버그: 별도 호출의 raw response 확인 (lookalike_celebs 누락 진단)
-      debugPrint('🟡 LOOKALIKE RAW (${raw.length} chars): ${raw.substring(0, raw.length.clamp(0, 800))}');
-      final parsed = _parseJson(raw);
-      debugPrint('🟡 LOOKALIKE PARSED keys: ${parsed.keys.toList()}');
-      return parsed;
-    } catch (e, st) {
-      debugPrint('🟡 LOOKALIKE error: $e\n$st');
+      return await _callClaude(
+        systemPrompt: lookalikeSystem,
+        userText: prompt,
+        imageBytes: imageBytes,
+        mimeType: mimeType,
+        maxTokens: 1024,
+      );
+    } catch (e) {
+      debugPrint('🟡 Claude LOOKALIKE error: $e');
       return {};
     }
+  }
+
+  // Claude API 호출 (HTTP REST + Vision) + 재시도 로직
+  // 529(Overloaded) / 429(Rate limit) / 5xx 시 exponential backoff 재시도
+  static Future<Map<String, dynamic>> _callClaude({
+    required String systemPrompt,
+    required String userText,
+    required Uint8List imageBytes,
+    required String mimeType,
+    required int maxTokens,
+  }) async {
+    final base64Image = base64Encode(imageBytes);
+    final uri = Uri.parse('https://api.anthropic.com/v1/messages');
+    final body = jsonEncode({
+      'model': kClaudeModel,
+      'max_tokens': maxTokens,
+      'system': systemPrompt,
+      'messages': [
+        {
+          'role': 'user',
+          'content': [
+            {
+              'type': 'image',
+              'source': {
+                'type': 'base64',
+                'media_type': mimeType,
+                'data': base64Image,
+              },
+            },
+            {'type': 'text', 'text': userText},
+          ],
+        }
+      ],
+    });
+
+    // 재시도: 1초 → 3초 (총 최대 2회 시도). UX상 너무 길지 않게.
+    const delays = [1, 3];
+    http.Response? lastRes;
+    String? lastError;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        final res = await http.post(
+          uri,
+          headers: {
+            'x-api-key': kAnthropicApiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: body,
+        ).timeout(const Duration(seconds: 40)); // 호출당 최대 40초
+
+        if (res.statusCode == 200) {
+          final response = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+          final content = response['content'] as List?;
+          if (content == null || content.isEmpty) {
+            throw Exception('Claude empty response');
+          }
+          final firstText = (content.first as Map)['text']?.toString() ?? '';
+          return _parseJson(firstText);
+        }
+
+        // 일시적 에러 (재시도 가능): 429, 5xx, 529 (Overloaded)
+        if (res.statusCode == 429 ||
+            res.statusCode == 529 ||
+            (res.statusCode >= 500 && res.statusCode < 600)) {
+          lastRes = res;
+          debugPrint('⚠️ Claude API ${res.statusCode} (재시도 ${attempt + 1}/2): 대기 ${delays[attempt]}초');
+          if (attempt < 1) {
+            await Future.delayed(Duration(seconds: delays[attempt]));
+            continue;
+          }
+        }
+
+        // 영구 에러 (4xx 등 — 재시도 의미 X)
+        throw Exception(
+            'Claude API ${res.statusCode}: ${utf8.decode(res.bodyBytes).substring(0, 200.clamp(0, res.bodyBytes.length))}');
+      } catch (e) {
+        lastError = e.toString();
+        if (e is Exception && e.toString().contains('Claude API') && !e.toString().contains('529') && !e.toString().contains('429') && !e.toString().contains('5')) {
+          rethrow; // 영구 에러는 즉시
+        }
+        if (attempt < 1) {
+          debugPrint('⚠️ Claude API 에러 (재시도 ${attempt + 1}/2): $e');
+          await Future.delayed(Duration(seconds: delays[attempt]));
+          continue;
+        }
+      }
+    }
+    // 2회 모두 실패
+    if (lastRes != null) {
+      throw Exception('Claude API 2회 재시도 모두 실패 (마지막: ${lastRes.statusCode}). 잠시 후 다시 시도해주세요.');
+    }
+    throw Exception('Claude API 2회 재시도 모두 실패: $lastError');
   }
 
   static String _buildPrompt(
@@ -180,53 +293,33 @@ class GeminiService {
 ## 동물상 카탈로그
 $catalogText
 
-## 컨설팅 톤 (필수 — 가장 중요)
-※ 톤은 **직설적 + 전문가 권위 + 단점 명시 + 즉시 실행 가능한 솔루션**.
-※ 예시 문장: "둥근~하트형 얼굴형. 이상적 가로~세로 비율이지만, 하안부가 큰 편 → 시선이 집중되어 하관이 도드라지는 단점. 솔루션: 외곽 라인 정리 헤어 + 광대 강조 메이크업으로 시선 분산."
-※ 단점은 반드시 명시하되, 반드시 **비의료 보완책**(헤어/메이크업/패션/그루밍)을 함께 제시.
-※ 위로형 단독 표현 금지: "자연스러워요", "친근해요", "부드러운 인상" 같은 표현만 단독 사용 X. 반드시 비율/구조 관찰 + 단점 + 솔루션 묶음.
+## 컨설팅 톤 (필수)
+※ **직설적 + 전문가 권위 + 단점 명시 + 즉시 실행 가능한 솔루션**.
+※ 예시: "둥근~하트형 얼굴형. 이상적 가로~세로 비율이지만, 하안부가 큰 편 → 시선이 집중되어 하관이 도드라지는 단점. 솔루션: 외곽 라인 정리 헤어 + 광대 강조 메이크업으로 시선 분산."
+※ 단점은 반드시 명시하되, **비의료 보완책**(헤어/메이크업/패션/그루밍)을 함께 제시.
 
 ## 콘텐츠 가이드
-※ target_animal(변신 추천)은 너가 자유 선택. 현재 동물상의 매력 강화 방향도 가능.
-※ 헤어/패션/그루밍 스타일링에 집중. 얼굴 미적 우열 평가 금지 (관찰까지만).
-※ 셀럽 레퍼런스는 작품명(연도) + 장면 + 이 사람 특징과의 연결 이유 포함.
-※ references의 셀럽은 반드시 **위키피디아 개인 페이지 있는 솔로 배우 또는 단독 활동 가수**. 그룹 이름 절대 금지 (위아이/BTS/트와이스 X). 멤버라도 본명 1명 (예: "정국" O, "BTS" X).
-※ 패션 references: 패션 화보 많은 배우 (박서준, 차은우, 김다미 등) 우선.
-※ 그루밍 references: 깔끔한 그루밍 배우 (박보검, 박은빈 등) — 그룹/직캠 금지.
+※ target_animal(변신 추천)은 자유 선택.
+※ references의 셀럽은 **위키피디아 개인 페이지 있는 솔로 배우 또는 단독 활동 가수**. 그룹 이름 절대 금지.
 
-## 솔루션 가이드 (필수)
-※ 솔루션은 반드시 **비의료 그루밍 영역**만: 헤어 라인 / 메이크업 쉐딩·하이라이트 / 안경테 / 옷 실루엣 / 액세서리 / 스킨케어 / 향수.
-※ 병원·클리닉 추천 금지. 약물 추천 금지. 의료 행위 권유 금지.
+## 솔루션 가이드
+※ 솔루션은 비의료 그루밍만: 헤어 / 메이크업 / 안경테 / 옷 실루엣 / 액세서리 / 스킨케어.
+※ 병원·클리닉 추천 금지. 약물 추천 금지.
 
 ## 기타
-※ 패션 제안 첫 문장에 "얼굴형 수치 기반 제안이에요" 포함.
 ※ ${gender == 'female' ? '여성이므로 메이크업 4단계 제품 추천 포함.' : '남성이므로 메이크업 대신 스킨케어+눈썹정리+헤어왁스+향수 그루밍 루틴 4단계 추천.'}
-※ lookalike_celebs는 사용자 사진과 실제로 닮은 한국 $genderKo 연예인 3명. 동물상 카탈로그 무시하고 얼굴 자체 유사성으로 판단. 영화/드라마 출연 배우 또는 인지도 높은 가수/아이돌 우선. 이름은 한국어 표기 정확히 (예: "박보검", "차은우"). trait 필드는 어디가 닮았는지 자연스러운 한 문장. work 필드는 대표작 또는 소속 짧게. trait과 work를 합쳤을 때 어색하지 않게.
-
-※ animal_distribution은 너가 사진을 직접 보고 판단한 동물상 분포 (참고용 ML Kit 수치는 무시 가능). 합 100. 메인 동물상이 1순위로 가장 높게. 보조 2~3개 합쳐 3개 항목. main_animal.name과 animal_distribution[0].name과 sub_animal.name과 animal_distribution[1].name은 반드시 일치.
-
-※ 절대로 lookalike_celebs와 animal_distribution 필드를 빠뜨리지 마. 응답 길이 줄여도 이 두 필드는 반드시 포함. 다른 필드를 줄여서라도 이 둘은 필수.
 
 $schema''';
   }
 
+  // _freeSchema와 _proSchema는 GeminiService와 동일한 응답 스키마 사용
   static String _freeSchema(String targetAnimal, String currentAnimal) => '''
-반드시 아래 JSON 형식으로만 응답하세요. lookalike_celebs와 animal_distribution은 반드시 첫 5개 필드 안에 응답:
+반드시 아래 JSON 형식으로만 응답:
 
 {
   "first_impression": {
     "summary": "첫인상 한 줄 요약 (20자 이상)",
     "face_shape": "얼굴형",
-    "lookalike_celebs": [
-      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
-      {"name": "한국 연예인 이름2 (개인 솔로/배우)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
-      {"name": "한국 연예인 이름3 (개인 솔로/배우)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"}
-    ],
-    "animal_distribution": [
-      {"name": "메인동물상", "percentage": 45},
-      {"name": "보조동물상1", "percentage": 30},
-      {"name": "보조동물상2", "percentage": 25}
-    ],
     "main_animal": {
       "name": "$currentAnimal",
       "emoji": "🐶",
@@ -251,7 +344,7 @@ $schema''';
       "above_percentile": 25
     },
     "weaknesses": [
-      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰 사실 (25자 이상)", "impact": "인상 영향 (20자 이상)", "solution": "비의료 보완책 (30자 이상)"},
+      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰 (25자 이상)", "impact": "인상 영향 (20자 이상)", "solution": "비의료 보완책 (30자 이상)"},
       {"title": "단점2", "observation": "...", "impact": "...", "solution": "..."},
       {"title": "단점3", "observation": "...", "impact": "...", "solution": "..."}
     ]
@@ -275,10 +368,10 @@ $schema''';
       "impact": "인상에 미치는 영향 (30자 이상)",
       "change": "개선 방법 (30자 이상)",
       "result": "변화 후 인상 (30자 이상)",
-      "application": "관찰→영향→변화→결과 연결 설명. 반드시 '이 변화만으로 ${targetAnimal}에 X% 더 가까워져요' 문장 포함. 강조어휘(핵심은/사실/근데/여기서 바뀌는) 1개 이상. 120자 이상.",
+      "application": "관찰→영향→변화→결과 연결 설명. 120자 이상.",
       "timeline": "오늘 가능",
       "gap_reduction": 15,
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+이 사람과의 연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
     },
     {
       "category": "패션",
@@ -286,7 +379,7 @@ $schema''';
       "impact": "인상에 미치는 영향 (30자 이상)",
       "change": "개선 방법 (30자 이상)",
       "result": "변화 후 인상 (30자 이상)",
-      "application": "반드시 '이 변화만으로 ${targetAnimal}에 X% 더 가까워져요' 문장 포함. 강조어휘 포함. 120자 이상.",
+      "application": "120자 이상.",
       "timeline": "1주일",
       "gap_reduction": 20,
       "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
@@ -297,29 +390,19 @@ $schema''';
       "impact": "인상에 미치는 영향 (30자 이상)",
       "change": "개선 방법 (30자 이상)",
       "result": "변화 후 인상 (30자 이상)",
-      "application": "120자 이상, 강조어휘 포함",
+      "application": "120자 이상.",
       "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
     }
   ]
 }''';
 
   static String _proSchema(String targetAnimal, String currentAnimal) => '''
-반드시 아래 JSON 형식으로만 응답하세요. lookalike_celebs와 animal_distribution은 반드시 첫 5개 필드 안에 응답 (토큰 부족 방지):
+반드시 아래 JSON 형식으로만 응답:
 
 {
   "first_impression": {
     "summary": "첫인상 한 줄 요약 (20자 이상)",
     "face_shape": "얼굴형",
-    "lookalike_celebs": [
-      {"name": "한국 연예인 이름1 (개인 솔로/배우, 그룹명 금지)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
-      {"name": "한국 연예인 이름2 (개인 솔로/배우)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"},
-      {"name": "한국 연예인 이름3 (개인 솔로/배우)", "trait": "어디가 닮았는지 (15자 이상)", "work": "대표작/소속 (10자 이상)"}
-    ],
-    "animal_distribution": [
-      {"name": "메인동물상", "percentage": 45},
-      {"name": "보조동물상1", "percentage": 30},
-      {"name": "보조동물상2", "percentage": 25}
-    ],
     "main_animal": {
       "name": "$currentAnimal",
       "emoji": "🐶",
@@ -332,7 +415,7 @@ $schema''';
       "tip": "스타일링 팁 (30자 이상)"
     },
     "sub_animal": {"name": "보조동물상", "emoji": "🐱", "keywords": ["키워드1", "키워드2"], "comment": "30자 이상"},
-    "target_animal": {"name": "추천 변신 동물상 (자유 선택, 동물상 카탈로그 중 하나)", "emoji": "이모지", "keywords": ["키워드1", "키워드2"], "comment": "20자 이상"},
+    "target_animal": {"name": "추천 변신 동물상 (자유 선택)", "emoji": "이모지", "keywords": ["키워드1", "키워드2"], "comment": "20자 이상"},
     "animal_match": {
       "main": "$currentAnimal",
       "percentage": 80,
@@ -347,11 +430,11 @@ $schema''';
     "appearance_tier": {
       "score": 7,
       "tier_name": "인스타에서 자주 보이는 유형",
-      "tier_description": "1=논외 / 6=잘생김 / 7=인스타 유형 / 8=연예인급 / 9=고등급 / 10=세계급. 6~10 중 객관적 1개",
+      "tier_description": "1=논외 / 6=잘생김 / 7=인스타 유형 / 8=연예인급 / 9=고등급 / 10=세계급",
       "above_percentile": 25
     },
     "weaknesses": [
-      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰 사실 (25자 이상, 부위/비율 명시)", "impact": "이게 인상에 주는 영향 (20자 이상)", "solution": "비의료 보완책 (헤어/메이크업/패션 — 30자 이상)"},
+      {"title": "단점1 (예: 하안부가 큰 편)", "observation": "관찰 사실 (25자 이상)", "impact": "인상 영향 (20자 이상)", "solution": "비의료 보완책 (30자 이상)"},
       {"title": "단점2", "observation": "...", "impact": "...", "solution": "..."},
       {"title": "단점3", "observation": "...", "impact": "...", "solution": "..."}
     ]
@@ -375,9 +458,9 @@ $schema''';
     "direction": "변화 방향 (20자 이상)"
   },
   "three_factor": {
-    "physical": {"summary": "신체 요약 (15자 이상)", "items": ["항목1", "항목2", "항목3"]},
-    "face": {"summary": "얼굴 요약 (15자 이상)", "items": ["항목1", "항목2", "항목3"]},
-    "fashion": {"summary": "패션 요약 (15자 이상)", "items": ["항목1", "항목2", "항목3"]}
+    "physical": "신체관리 한 문단 (40자 이상)",
+    "face": "얼굴관리 한 문단 (40자 이상)",
+    "fashion": "패션 한 문단 (40자 이상)"
   },
   "action_cards": [
     {
@@ -386,8 +469,8 @@ $schema''';
       "impact": "영향 (30자 이상)",
       "change": "개선 (30자 이상)",
       "result": "결과 (30자 이상)",
-      "application": "120자 이상, 강조어휘 1개 이상",
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "application": "120자 이상",
+      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
     },
     {
       "category": "패션",
@@ -395,8 +478,8 @@ $schema''';
       "impact": "영향 (30자 이상)",
       "change": "개선 (30자 이상)",
       "result": "결과 (30자 이상)",
-      "application": "120자 이상, 강조어휘 1개 이상",
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "application": "120자 이상",
+      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
     },
     {
       "category": "그루밍",
@@ -404,20 +487,20 @@ $schema''';
       "impact": "영향 (30자 이상)",
       "change": "개선 (30자 이상)",
       "result": "결과 (30자 이상)",
-      "application": "120자 이상, 강조어휘 1개 이상",
-      "references": [{"name": "셀럽명", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
+      "application": "120자 이상",
+      "references": [{"name": "솔로 배우/가수 이름", "context": "작품(연도)+장면+연결이유 (50자 이상)", "description": "스타일 요소 (30자 이상)"}]
     }
   ],
   "makeup_steps": [
-    {"step_number": 1, "step_name": "기초", "description": "기초 단계 설명", "products": [{"name": "제품명", "shade": null, "category": "카테고리", "usage": "사용법"}, {"name": "제품명2", "shade": null, "category": "카테고리2", "usage": "사용법2"}], "tip": "팁"},
-    {"step_number": 2, "step_name": "베이스", "description": "베이스 단계", "products": [{"name": "제품명", "shade": "색상", "category": "파운데이션", "usage": "사용법"}, {"name": "제품명2", "shade": null, "category": "컨실러", "usage": "사용법2"}], "tip": "팁"},
-    {"step_number": 3, "step_name": "음영", "description": "음영 단계", "products": [{"name": "제품명", "shade": "색상", "category": "눈썹", "usage": "사용법"}, {"name": "제품명2", "shade": null, "category": "쉐딩", "usage": "사용법2"}], "tip": "팁"},
-    {"step_number": 4, "step_name": "마무리", "description": "마무리 단계", "products": [{"name": "제품명", "shade": null, "category": "파우더", "usage": "사용법"}, {"name": "제품명2", "shade": null, "category": "픽서", "usage": "사용법2"}], "tip": "팁"}
+    {"step_number": 1, "step_name": "기초", "description": "기초 단계 설명", "products": [{"name": "제품명", "shade": null, "category": "카테고리", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 2, "step_name": "베이스", "description": "베이스 단계", "products": [{"name": "제품명", "shade": "색상", "category": "파운데이션", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 3, "step_name": "음영", "description": "음영 단계", "products": [{"name": "제품명", "shade": "색상", "category": "눈썹", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 4, "step_name": "마무리", "description": "마무리 단계", "products": [{"name": "제품명", "shade": null, "category": "파우더", "usage": "사용법"}], "tip": "팁"}
   ],
   "fashion_looks": [
     {
       "name": "룩 이름1 (예: 데일리 베이직)",
-      "image_keyword": "Unsplash 검색용 영어 키워드 — 룩의 핵심 아이템/스타일/색상을 3~5단어로 (예: 'white linen shirt jeans men casual')",
+      "image_keyword": "Unsplash 영어 키워드 (예: 'white linen shirt jeans men casual')",
       "items": [
         {"category": "Outer", "description": "아우터 설명", "rationale": "이유"},
         {"category": "Top", "description": "상의 설명", "rationale": "이유"},
@@ -430,8 +513,8 @@ $schema''';
       "color_palette": ["#000000", "#FFFFFF"]
     },
     {
-      "name": "룩 이름2 (반드시 룩1과 다른 컨셉 — 예: 룩1이 캐주얼이면 룩2는 포멀/세미포멀)",
-      "image_keyword": "룩2의 영어 키워드 (룩1과 명확히 다른 키워드)",
+      "name": "룩 이름2 (룩1과 다른 컨셉)",
+      "image_keyword": "룩2 영어 키워드",
       "items": [
         {"category": "Outer", "description": "설명", "rationale": "이유"},
         {"category": "Top", "description": "설명", "rationale": "이유"},
@@ -439,7 +522,7 @@ $schema''';
         {"category": "Shoes", "description": "설명", "rationale": "이유"},
         {"category": "Acc", "description": "설명", "rationale": "이유"}
       ],
-      "rationale": "전체 코디 이유 (룩1과 달라야 함)",
+      "rationale": "전체 코디 이유",
       "styling_tip": "스타일링 팁",
       "color_palette": ["#000000", "#808080"]
     }
@@ -463,7 +546,7 @@ $schema''';
       if (match != null) {
         return jsonDecode(match.group(0)!) as Map<String, dynamic>;
       }
-      throw Exception('JSON 파싱 실패: ${cleaned.substring(0, cleaned.length.clamp(0, 200))}');
+      throw Exception('Claude JSON 파싱 실패: ${cleaned.substring(0, cleaned.length.clamp(0, 200))}');
     }
   }
 }
