@@ -13,6 +13,8 @@ class ShareResultCard extends StatelessWidget {
   final String tier;
   final Color tierColor;
   final int gapPercent;
+  final String celebName;
+  final int abovePercentile;
 
   const ShareResultCard({
     super.key,
@@ -28,6 +30,8 @@ class ShareResultCard extends StatelessWidget {
     required this.tier,
     required this.tierColor,
     required this.gapPercent,
+    this.celebName = '',
+    this.abovePercentile = 0,
   });
 
   @override
@@ -44,11 +48,39 @@ class ShareResultCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // 앱 이름
-          const Text('닮은꼴 찾기',
+          const Text('APEX AURA',
               style: TextStyle(
                   fontSize: 10, color: Color(0xFF555555),
                   letterSpacing: 3, fontWeight: FontWeight.w600)),
           const SizedBox(height: 16),
+
+          // 닮은꼴 연예인 + 상위% (자랑 hook)
+          if (celebName.isNotEmpty || abovePercentile > 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (celebName.isNotEmpty) ...[
+                  const Text('🌟', style: TextStyle(fontSize: 15)),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text('$celebName 닮은꼴',
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w800,
+                            color: Color(0xFFE8D5B7))),
+                  ),
+                ],
+                if (celebName.isNotEmpty && abovePercentile > 0)
+                  const Text('  ·  ',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF555555))),
+                if (abovePercentile > 0)
+                  Text('상위 $abovePercentile%',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800,
+                          color: Color(0xFFE8A030))),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
 
           // 메인 동물상
           Row(
@@ -193,7 +225,7 @@ class ShareResultCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text('Play 스토어 → 닮은꼴 찾기 검색',
+          const Text('Play 스토어 → Apex Aura 검색',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 9, color: Color(0xFF555555))),
           const SizedBox(height: 10),

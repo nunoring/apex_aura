@@ -132,7 +132,7 @@ class ClaudeService {
       userText: prompt,
       imageBytes: compressed,
       mimeType: 'image/jpeg',
-      maxTokens: 4096,
+      maxTokens: 4608, // 6144는 생성 50초+ → 타임아웃. 단축(잘리면 balancer 복구). 측정값 인용은 prompt 지시로 유지
     );
   }
 
@@ -150,7 +150,7 @@ class ClaudeService {
       userText: prompt,
       imageBytes: compressed,
       mimeType: 'image/jpeg',
-      maxTokens: 2048,
+      maxTokens: 6144, // makeup 4단계 + 패션 측정값 인용 rationale로 응답 길어짐
     );
   }
 
@@ -202,7 +202,7 @@ class ClaudeService {
         'content-type': 'application/json',
       },
       body: body,
-    ).timeout(const Duration(seconds: 50));
+    ).timeout(const Duration(seconds: 65));
     sw.stop();
     debugPrint('⏱️ Claude API 응답 ${sw.elapsedMilliseconds}ms (status ${res.statusCode})');
 
@@ -235,11 +235,29 @@ class ClaudeService {
     final eyeAngle = faceData['eye_angle'] ?? 0;
     final eyeAngleDesc = faceData['eye_angle_desc'] ?? '수평';
     final faceShape = faceData['face_shape'] ?? '계란형';
+    final goldenRatio = faceData['golden_ratio']?.toString() ?? '-';
+    final goldenDesc = faceData['golden_desc']?.toString() ?? '';
+    final faceRatio = faceData['face_ratio']?.toString() ?? '-';
+    final eyeGap = faceData['eye_gap_ratio']?.toString() ?? '-';
+    final eyeGapDesc = faceData['eye_gap_desc']?.toString() ?? '';
+    final noseWidth = faceData['nose_width_ratio']?.toString() ?? '-';
+    final noseDesc = faceData['nose_desc']?.toString() ?? '';
+    final symmetry = faceData['symmetry_score']?.toString() ?? '-';
 
     final schema = isPro ? _proMainSchema(animalType, currentFaceType) : _freeSchema(animalType, currentFaceType);
 
     return '''사진 속 $genderKo의 외모를 직설적으로 분석. 톤: 단점 명시 + 비의료 솔루션.
-참고: 눈꼬리 ${eyeAngle}° ($eyeAngleDesc), 얼굴형 $faceShape, ML Kit 판정 $currentFaceType.
+
+## 이 얼굴 ML Kit 실측 데이터 (아래 규칙대로만 인용)
+- 얼굴형: $faceShape / ML Kit 판정 동물상: $currentFaceType
+- 황금비율(이마:코:턱): $goldenRatio ($goldenDesc)
+- 얼굴 가로세로 비율: $faceRatio
+- 눈꼬리 각도: ${eyeAngle}° ($eyeAngleDesc)
+- 눈 간격 비율: $eyeGap ($eyeGapDesc)
+- 코 너비 비율: $noseWidth ($noseDesc)
+- 좌우 대칭도: $symmetry
+→ 측정 수치 인용은 weaknesses·action_cards·consultant_report·솔루션에만 ("황금비 $goldenRatio → ..." 식, 일반론 금지).
+→ ⚠️ first_impression(summary·strengths·keywords)에는 측정 수치 넣지 말 것. 첫인상은 인상·매력·느낌 위주로 짧고 깔끔하게.
 
 $_consultingFramework
 
@@ -260,8 +278,23 @@ $schema''';
   static String _buildStylingPrompt(String gender, Map<String, dynamic> faceData) {
     final genderKo = gender == 'female' ? '여성' : '남성';
     final faceShape = faceData['face_shape'] ?? '계란형';
+    final goldenRatio = faceData['golden_ratio']?.toString() ?? '-';
+    final goldenDesc = faceData['golden_desc']?.toString() ?? '';
+    final faceRatio = faceData['face_ratio']?.toString() ?? '-';
+    final eyeGap = faceData['eye_gap_ratio']?.toString() ?? '-';
+    final eyeGapDesc = faceData['eye_gap_desc']?.toString() ?? '';
+    final noseWidth = faceData['nose_width_ratio']?.toString() ?? '-';
+    final noseDesc = faceData['nose_desc']?.toString() ?? '';
 
-    return '''사진 속 $genderKo(얼굴형 $faceShape) 기준 스타일링 추천. 메이크업 2단계 + 패션 룩 2개.
+    return '''사진 속 $genderKo 기준 스타일링 추천. 메이크업 4단계 + 패션 룩 2개.
+
+## 이 얼굴 ML Kit 실측 데이터 (추천 근거로 반드시 인용)
+- 얼굴형: $faceShape
+- 황금비율(이마:코:턱): $goldenRatio ($goldenDesc)
+- 얼굴 가로세로 비율: $faceRatio
+- 눈 간격 비율: $eyeGap ($eyeGapDesc)
+- 코 너비 비율: $noseWidth ($noseDesc)
+→ 모든 추천(메이크업·패션)의 rationale에 위 수치를 직접 짚어 설명. 일반론 금지.
 
 ## 도구 박스 (적극 활용)
 ### 컬러 시즌 4분류
@@ -270,23 +303,30 @@ $schema''';
 - Autumn Warm: 테라코타, 카멜, 올리브
 - Winter Cool: 블랙, 와인, 쨍한 화이트
 
-### ${gender == 'female' ? 'K-뷰티 메이크업 2단계 공식 (여성)' : '남성 그루밍·메이크업 2단계 공식'}
-${gender == 'female' ? '''- 베이스: 스킨/메이크업 베이스 + 톤 보정 (글로우 vs 매트), 컨실러+하이라이터+쉐딩
-- 포인트: 아이브로우 + 아이라이너 + 마스카라 + 블러셔 + 립 (시즌 컬러 매칭)''' : '''- 베이스(그루밍+가벼운 화장): 세안+토너+수분크림 → BB크림 또는 톤업크림으로 피부톤 균일화 (남성용 라인 추천, 자연스럽게)
-- 포인트: 눈썹 정리 + 가벼운 컨실러 (다크서클·잡티) + 헤어 왁스 + 향수
+### 얼굴형별 컨투어링·블러셔 배치 ($faceShape 기준으로 적용)
+- 둥근형: 광대 아래 세로 쉐딩, 블러셔 사선 위로 → 얼굴 길어 보이게
+- 각진형: 턱·이마 모서리 쉐딩으로 각 완화, 블러셔 둥글게
+- 긴형: 이마 위·턱 끝 가로 쉐딩으로 길이 축소, 블러셔 가로로
+- 계란형: 기본 균형 유지, 광대 살짝 강조
+
+### ${gender == 'female' ? 'K-뷰티 메이크업 4단계 (여성)' : '남성 그루밍·메이크업 4단계'}
+${gender == 'female' ? '''1) 베이스: 스킨케어 → 메이크업 베이스 + 톤 보정 (글로우/매트)
+2) 피부 표현: 파운데이션 + 컨실러(다크서클·잡티) + 파우더
+3) 눈썹+아이: 아이브로우 + 아이섀도(시즌 컬러) + 아이라이너 + 마스카라
+4) 컨투어+포인트: 얼굴형별 쉐딩/하이라이트 + 블러셔 + 립 (시즌 컬러)''' : '''1) 베이스: 세안 → 토너 → 수분크림 (남성용 라인)
+2) 피부 표현: BB크림 또는 톤업크림으로 피부톤 균일화 + 가벼운 컨실러(다크서클·잡티)
+3) 눈썹+아이: 눈썹 결 정리 + (선택) 연한 아이브로우
+4) 컨투어+마무리: 얼굴형별 가벼운 쉐딩 + 헤어 왁스 + 향수
 - 남성도 가벼운 화장 OK (BB/톤업/컨실러). 의료/시술 X.'''}
 
 ### 패션 실루엣 5분류
 - 클래식 / 캐주얼 / 모던 / 스트릿 / 빈티지
 
 ## 패션 룩 작성 규칙 (중요)
-- fashion_looks 2개 작성 (서로 다른 컨셉, 예: 데일리 캐주얼 + 정장/세미포멀)
-- 각 룩의 rationale에는 **"왜 이 사람에게 어울리는가"** 명시:
-  - 얼굴형($faceShape)과의 조합 이유
-  - 체형/인상과의 매칭 근거
-  - 컬러 시즌과 톤 매칭 설명
-  - 예: "각진 턱선을 부드럽게 하는 라운드 넥 + 차분한 회색은 강한 인상 완화. Summer Cool 톤이라 그레이/네이비 무채색이 피부톤 살림."
-- items 각자 rationale에 "왜 이 아이템인지" 단순한 한 줄
+- fashion_looks 2개 (서로 다른 컨셉, 예: 데일리 캐주얼 + 정장/세미포멀)
+- 각 룩의 rationale에 **실측 수치 인용 + "왜 어울리는가"** 명시:
+  - 예: "얼굴 가로세로 $faceRatio → 가로 볼륨 주는 라운드넥 + 레이어드로 길이감 분산. 황금비 $goldenRatio($goldenDesc)이라 심플한 핏이 비율 살림. Summer Cool이면 그레이/네이비가 피부톤 살림."
+- items 각자 rationale에 "왜 이 아이템인지" 한 줄
 
 ${_stylingSchema()}''';
   }
@@ -491,8 +531,10 @@ ${_stylingSchema()}''';
 
 {
   "makeup_steps": [
-    {"step_number": 1, "step_name": "베이스", "description": "베이스 단계 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "파운데이션/BB/톤업", "usage": "사용법"}], "tip": "팁"},
-    {"step_number": 2, "step_name": "포인트", "description": "포인트 단계 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "카테고리", "usage": "사용법"}], "tip": "팁"}
+    {"step_number": 1, "step_name": "베이스", "description": "스킨케어+톤보정 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "스킨케어/베이스", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 2, "step_name": "피부 표현", "description": "파운데이션/BB+컨실러 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "파운데이션/BB/컨실러", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 3, "step_name": "눈썹+아이", "description": "눈썹/아이 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "아이브로우/아이섀도", "usage": "사용법"}], "tip": "팁"},
+    {"step_number": 4, "step_name": "컨투어+포인트", "description": "얼굴형 기반 쉐딩/블러셔/립 짧게", "products": [{"name": "제품명", "shade": "색상", "category": "쉐딩/블러셔/립", "usage": "사용법"}], "tip": "얼굴형별 배치 팁"}
   ],
   "fashion_looks": [
     {

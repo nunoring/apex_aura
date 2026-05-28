@@ -358,12 +358,12 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 상단 로고 + 빌드 확인 마커
+              // 상단 로고
               const Center(
                 child: Column(
                   children: [
                     Text(
-                      "닮은꼴 찾기",
+                      "Apex Aura",
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
@@ -377,15 +377,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         color: Color(0xFF666644),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "[BUILD 2026-05-22-A]",
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: Color(0xFFE8A030),
                         letterSpacing: 0.5,
                       ),
                     ),

@@ -7,6 +7,7 @@ import 'result_screen.dart';
 import 'face_detector_service.dart';
 import 'face_selection_screen.dart';
 import 'history_service.dart';
+import 'subscription_service.dart';
 
 class _AnalysisException implements Exception {
   final String code;
@@ -45,6 +46,7 @@ class _LoadingScreenState extends State<LoadingScreen>
   int _currentStep = 0;
   int _gptMessageIndex = 0;
   bool _isGptPhase = false;
+  bool _effectiveIsPro = false;
 
   // GPT 분석 중 사이클 메시지
   final List<String> _gptMessages = [
@@ -137,6 +139,8 @@ class _LoadingScreenState extends State<LoadingScreen>
   Future<void> _analyzeImage() async {
     try {
       final selectedIndex = widget.faceIndex < 0 ? 0 : widget.faceIndex;
+      // styling/메인 Pro 판정 — widget.isPro가 타이밍상 false로 들어올 수 있어 SubscriptionService로 재확인 (ResultScreen과 일관)
+      _effectiveIsPro = widget.isPro || await SubscriptionService.isSubscribed();
 
       // 진행바 즉시 시작 — ML Kit 구간부터 보이도록
       _timerController.forward();
@@ -209,7 +213,7 @@ class _LoadingScreenState extends State<LoadingScreen>
       // 메인 호출과 동시에 styling 호출도 백그라운드로 시작 (Pro인 경우)
       // 메인 응답 도착하면 즉시 ResultScreen 진입, styling은 사용자가 페이지 swipe할 때까지 계속 진행
       Future<Map<String, dynamic>>? stylingFuture;
-      if (widget.isPro) {
+      if (_effectiveIsPro) {
         try {
           final imageBytes = await widget.primaryImage.readAsBytes();
           stylingFuture = ClaudeService.analyzeStyling(
@@ -293,7 +297,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               .isNotEmpty
               ? result['first_impression']!['target_animal']!['name']!.toString()
               : currentType);
-      HistoryService.save(
+      final histId = await HistoryService.save(
         currentType: currentType,
         targetType: resolvedAnimalType,
         gender: widget.gender,
@@ -316,6 +320,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               faceData: faceData!,
               gender: widget.gender,
               stylingFuture: stylingFuture,
+              historyId: histId,
             ),
           ),
         );
@@ -387,7 +392,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         animalType: effectiveAnimalType,
         gender: widget.gender,
         faceData: faceData,
-        isPro: widget.isPro,
+        isPro: _effectiveIsPro,
       );
       debugPrint('🟢 Claude main response OK (${jsonEncode(result).length} chars)');
       return result;

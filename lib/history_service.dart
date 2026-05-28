@@ -7,7 +7,7 @@ class HistoryService {
   static const _key = 'analysis_history_v1';
   static const _maxRecords = 20;
 
-  static Future<void> save({
+  static Future<String?> save({
     required String currentType,
     required String targetType,
     required String gender,
@@ -46,9 +46,35 @@ class HistoryService {
       list.insert(0, record);
       if (list.length > _maxRecords) list.removeRange(_maxRecords, list.length);
       await prefs.setString(_key, jsonEncode(list));
+      return id;
     } catch (_) {
       // 저장 실패 시 앱 흐름에 영향 없도록 무시
+      return null;
     }
+  }
+
+  // styling(makeup/fashion)이 백그라운드로 늦게 도착 → 기존 레코드에 병합
+  // (저장은 메인 결과만 먼저 됨 → 도착 후 이걸로 갱신해야 과거 기록에도 보임)
+  static Future<void> updateStyling(String id,
+      {List<dynamic>? makeupSteps, List<dynamic>? fashionLooks}) async {
+    if (makeupSteps == null && fashionLooks == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
+      if (raw == null) return;
+      final list = jsonDecode(raw) as List;
+      for (final rec in list) {
+        if ((rec as Map)['id'] == id) {
+          final ar = Map<String, dynamic>.from(
+              rec['analysisResult'] as Map? ?? {});
+          if (makeupSteps != null) ar['makeup_steps'] = makeupSteps;
+          if (fashionLooks != null) ar['fashion_looks'] = fashionLooks;
+          rec['analysisResult'] = ar;
+          break;
+        }
+      }
+      await prefs.setString(_key, jsonEncode(list));
+    } catch (_) {}
   }
 
   static Future<List<Map<String, dynamic>>> load() async {

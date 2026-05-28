@@ -36,6 +36,7 @@ import 'widgets/target_animal_card.dart';
 import 'widgets/celeb_match_card.dart';
 import 'widgets/share_result_card.dart';
 import 'services/animal_score_service.dart';
+import 'history_service.dart';
 
 class ResultScreen extends StatefulWidget {
   final String animalType;
@@ -45,6 +46,7 @@ class ResultScreen extends StatefulWidget {
   final Map<String, dynamic> faceData;
   final String gender;
   final Future<Map<String, dynamic>>? stylingFuture;
+  final String? historyId;
 
   const ResultScreen({
     super.key,
@@ -55,6 +57,7 @@ class ResultScreen extends StatefulWidget {
     required this.faceData,
     this.gender = 'male',
     this.stylingFuture,
+    this.historyId,
   });
 
   @override
@@ -90,6 +93,9 @@ class _ResultScreenState extends State<ResultScreen> {
     try {
       final styling = await widget.stylingFuture!;
       if (!mounted) return;
+      debugPrint('🎨 styling 도착: keys=${styling.keys.toList()} '
+          'makeup=${(styling['makeup_steps'] as List?)?.length} '
+          'fashion=${(styling['fashion_looks'] as List?)?.length}');
       if (styling.isEmpty) {
         setState(() {
           _stylingLoading = false;
@@ -108,6 +114,14 @@ class _ResultScreenState extends State<ResultScreen> {
       });
       // 페이지 다시 빌드 (Pro 페이지에 데이터 반영)
       _initPageFlow();
+      // 히스토리에도 styling 반영 (과거 기록 다시 열 때 makeup/fashion 보이도록)
+      if (widget.historyId != null) {
+        HistoryService.updateStyling(
+          widget.historyId!,
+          makeupSteps: styling['makeup_steps'] as List?,
+          fashionLooks: styling['fashion_looks'] as List?,
+        );
+      }
     } catch (e) {
       debugPrint('🟡 styling 결과 처리 실패: $e');
       if (mounted) {
@@ -846,16 +860,6 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  // 메이크업 단계명 → Unsplash 영어 키워드
-  String _makeupKeyword(String stepName) {
-    final s = stepName.trim();
-    if (s.contains('기초') || s.contains('스킨')) return 'skincare beauty product';
-    if (s.contains('베이스') || s.contains('파운데이션')) return 'foundation makeup beauty';
-    if (s.contains('음영') || s.contains('아이') || s.contains('눈')) return 'eyeshadow makeup';
-    if (s.contains('마무리') || s.contains('립') || s.contains('블러셔')) return 'lipstick blush makeup';
-    return 'makeup beauty';
-  }
-
   // 액션 카드 + references 셀럽 사진 (위키 API)
   Widget _actionCardWithCeleb({
     required String category,
@@ -1106,7 +1110,6 @@ class _ResultScreenState extends State<ResultScreen> {
             ...looks.asMap().entries.map((entry) {
               final look = entry.value;
               final lookName = look['name']?.toString() ?? '';
-              // Gemini가 응답한 image_keyword (영어) 우선 사용, 없으면 성별+이름 fallback
               final imageKeyword = look['image_keyword']?.toString() ?? '';
               final fashionKeyword = imageKeyword.isNotEmpty
                   ? imageKeyword
@@ -1124,13 +1127,19 @@ class _ResultScreenState extends State<ResultScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Unsplash 패션 룩 이미지 (단품/플랫레이, 잘림 방지 contain)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 200,
-                    child: _unsplashImage(fashionKeyword,
-                        width: double.infinity, height: 200, fit: BoxFit.contain),
+                  // 패션 룩 예시 이미지 (참고용 느낌 전달 — 정확한 상품 아님)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 200,
+                      child: _unsplashImage(fashionKeyword,
+                          width: double.infinity, height: 200, fit: BoxFit.cover),
+                    ),
                   ),
+                  const SizedBox(height: 6),
+                  const Text('※ 분위기 참고용 예시 이미지예요',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF555555))),
                   const SizedBox(height: 12),
                   Text(lookName,
                       style: const TextStyle(fontSize: 13, color: Color(0xFFE8D5B7), fontWeight: FontWeight.w600)),
@@ -1336,97 +1345,7 @@ class _ResultScreenState extends State<ResultScreen> {
             child: Text(displayName,
                 style: const TextStyle(fontSize: 12, color: Color(0xFFCCCCCC), height: 1.4)),
           ),
-          GestureDetector(
-            onTap: () => _showInAppImageDialog(name),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFF333333), width: 0.5),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.image_outlined, size: 11, color: Color(0xFF888888)),
-                  SizedBox(width: 3),
-                  Text('이미지',
-                      style: TextStyle(fontSize: 9, color: Color(0xFF888888))),
-                ],
-              ),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-
-  // 인앱 이미지 다이얼로그 (외부 브라우저 안 열고 Unsplash 사진 1장 표시)
-  void _showInAppImageDialog(String query) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withAlpha(220),
-      builder: (ctx) => GestureDetector(
-        onTap: () => Navigator.pop(ctx),
-        child: Stack(
-          children: [
-            Center(
-              child: FutureBuilder<String?>(
-                future: UnsplashService.fetchImageUrl(query),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SizedBox(
-                      width: 30, height: 30,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Color(0xFF888888)),
-                    );
-                  }
-                  final url = snapshot.data;
-                  if (url == null || url.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Text('이미지를 찾을 수 없어요\n($query)',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Color(0xFFAAAAAA), fontSize: 14)),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: InteractiveViewer(
-                        child: Image.network(url, fit: BoxFit.contain),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Positioned(
-              top: 40, right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-            ),
-            Positioned(
-              bottom: 40, left: 20, right: 20,
-              child: Column(
-                children: [
-                  Text(query,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 14,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  const Text('© Unsplash',
-                      style: TextStyle(color: Color(0xFF666666), fontSize: 9)),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -3893,6 +3812,12 @@ class _ResultScreenState extends State<ResultScreen> {
               (sorted.isNotEmpty ? sorted[0].value.round() : 70));
       final subPercent = scores[subAnimal]?.round() ??
           (sorted.length > 1 ? sorted[1].value.round() : 20);
+      final fiShare = analysisResult['first_impression'] as Map<String, dynamic>?;
+      final shareCeleb = (fiShare?['lookalike_celebs'] as List?)?.isNotEmpty == true
+          ? (((fiShare!['lookalike_celebs'] as List)[0] as Map)['name']?.toString() ?? '')
+          : '';
+      final shareAbovePct =
+          (fiShare?['appearance_tier']?['above_percentile'] as num?)?.toInt() ?? 0;
 
       final Uint8List image = await _screenshotController.captureFromWidget(
         ShareResultCard(
@@ -3908,6 +3833,8 @@ class _ResultScreenState extends State<ResultScreen> {
           tier: s.tier,
           tierColor: s.tierColor,
           gapPercent: (analysisResult['comparison']?['gap_percent'] as num?)?.toInt() ?? 45,
+          celebName: shareCeleb,
+          abovePercentile: shareAbovePct,
         ),
         pixelRatio: 3.0,
         context: context,
@@ -3919,8 +3846,9 @@ class _ResultScreenState extends State<ResultScreen> {
 
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: '나는 $mainAnimal ${sorted.isNotEmpty ? sorted[0].value.round() : 70}%\n'
-              '목표: $animalType 🔥\n\n'
+        text: '${shareCeleb.isNotEmpty ? "나 $shareCeleb 닮은꼴이래 😎\n" : ""}'
+              '$mainAnimal ${sorted.isNotEmpty ? sorted[0].value.round() : 70}%'
+              '${shareAbovePct > 0 ? " · 상위 $shareAbovePct%" : ""} 🔥\n\n'
               '내 얼굴 AI 분석하기 👇\n'
               '#ApexAura #동물상분석',
       );

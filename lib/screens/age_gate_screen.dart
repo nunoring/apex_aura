@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AgeGateScreen extends StatefulWidget {
@@ -15,22 +16,71 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
   bool _showBlock = false;
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    DateTime temp = _selectedDate ?? DateTime(2000, 1, 1);
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: DateTime(2000, 1, 1),
-      firstDate: DateTime(1920),
-      lastDate: DateTime.now(),
-      helpText: '생년월일 선택',
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFFE8D5B7),
-            onPrimary: Colors.black,
-            surface: Color(0xFF1A1A1A),
-          ),
-        ),
-        child: child!,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('생년월일 선택',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(ctx, temp),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8D5B7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('완료',
+                            style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF2A2A2A), height: 1),
+              SizedBox(
+                height: 216,
+                child: CupertinoTheme(
+                  data: const CupertinoThemeData(
+                    brightness: Brightness.dark,
+                    textTheme: CupertinoTextThemeData(
+                      dateTimePickerTextStyle:
+                          TextStyle(color: Colors.white, fontSize: 19),
+                    ),
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.date,
+                    initialDateTime: temp,
+                    minimumDate: DateTime(1920),
+                    maximumDate: DateTime.now(),
+                    onDateTimeChanged: (d) => temp = d,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -57,6 +107,7 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('birth_date', _selectedDate!.toIso8601String());
     await prefs.setInt('user_age', age);
+    await prefs.setBool('age_passed', true);
     widget.onPassed();
   }
 
